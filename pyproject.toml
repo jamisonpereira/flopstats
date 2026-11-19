@@ -1,0 +1,9 @@
+# Virtual uv workspace root so `uv run ...` works from the repo root (where .env lives).
+[tool.uv.workspace]
+members = ["pipeline"]
+
+[dependency-groups]
+dev = ["flopstats", "pytest>=8", "respx>=0.21"]
+
+[tool.uv.sources]
+flopstats = { workspace = true }
