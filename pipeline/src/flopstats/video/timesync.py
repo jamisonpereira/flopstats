@@ -23,7 +23,7 @@ HALF_S = 45 * 60
 MAX_FIRST_HALF_STOPPAGE_S = 10 * 60
 AGREE_S = 3.0
 MIN_AGREEING = 5
-MIN_CONFIDENCE = 0.5
+MIN_CONFIDENCE = 0.2  # the ±3 s agreement of ≥5 readings is the real guard
 EDGE_S = 120.0
 
 

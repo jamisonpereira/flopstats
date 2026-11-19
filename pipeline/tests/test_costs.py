@@ -35,3 +35,9 @@ def test_guard_raises_when_estimate_would_exceed_budget(db, settings):
 def test_guard_allows_spend_up_to_budget(db, settings):
     _record(db, "bulk", "499.50")
     costs.guard(db, settings, Decimal("0.50"))  # exactly 500: allowed
+
+
+def test_tiny_charges_are_not_rounded(db):
+    for i in range(3):
+        _record(db, f"w{i}", "0.0001649")
+    assert costs.spent(db) == Decimal("0.0004947")

@@ -72,7 +72,7 @@ def test_sync_low_confidence_readings_are_ignored():
     class Unsure(FakeReader):
         def read(self, png):
             r = super().read(png)
-            return r and ClockReading(r.minute, r.second, confidence=0.2)
+            return r and ClockReading(r.minute, r.second, confidence=0.05)
 
     assert sync("m.mp4", DURATION, Unsure(), extract=fake_extract).status == "needs_review"
 
