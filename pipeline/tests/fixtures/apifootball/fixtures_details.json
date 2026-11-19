@@ -1,0 +1,605 @@
+{
+ "get": "fixtures",
+ "parameters": {
+  "ids": "1208021-1208022"
+ },
+ "errors": [],
+ "results": 2,
+ "paging": {
+  "current": 1,
+  "total": 1
+ },
+ "response": [
+  {
+   "fixture": {
+    "id": 1208021,
+    "date": "2024-08-16T19:00:00+00:00",
+    "referee": "R. Jones",
+    "venue": {
+     "id": 556,
+     "name": "Old Trafford",
+     "city": "Manchester"
+    },
+    "status": {
+     "short": "FT",
+     "long": "Match Finished"
+    }
+   },
+   "league": {
+    "id": 39,
+    "name": "Premier League",
+    "country": "England",
+    "season": 2024,
+    "round": "Regular Season - 1",
+    "logo": "https://media.api-sports.io/football/leagues/39.png",
+    "flag": "https://media.api-sports.io/flags/gb-eng.svg"
+   },
+   "teams": {
+    "home": {
+     "id": 33,
+     "name": "Manchester United",
+     "logo": "https://media.api-sports.io/football/teams/33.png"
+    },
+    "away": {
+     "id": 36,
+     "name": "Fulham",
+     "logo": "https://media.api-sports.io/football/teams/36.png"
+    }
+   },
+   "goals": {
+    "home": 1,
+    "away": 0
+   },
+   "lineups": [
+    {
+     "team": {
+      "id": 33,
+      "name": "Manchester United",
+      "logo": "https://media.api-sports.io/football/teams/33.png"
+     },
+     "coach": {
+      "id": 1993,
+      "name": "E. ten Hag",
+      "photo": "https://media.api-sports.io/football/coachs/1993.png"
+     },
+     "startXI": [
+      {
+       "player": {
+        "id": 19220,
+        "name": "M. Mount",
+        "number": 7,
+        "pos": "M",
+        "grid": null
+       }
+      },
+      {
+       "player": {
+        "id": 526,
+        "name": "A. Onana",
+        "number": 24,
+        "pos": "G",
+        "grid": null
+       }
+      }
+     ],
+     "substitutes": [
+      {
+       "player": {
+        "id": 70100,
+        "name": "J. Zirkzee",
+        "number": 11,
+        "pos": "F",
+        "grid": null
+       }
+      }
+     ]
+    },
+    {
+     "team": {
+      "id": 36,
+      "name": "Fulham",
+      "logo": "https://media.api-sports.io/football/teams/36.png"
+     },
+     "coach": {
+      "id": 2407,
+      "name": "Marco Silva",
+      "photo": "https://media.api-sports.io/football/coachs/2407.png"
+     },
+     "startXI": [
+      {
+       "player": {
+        "id": 152967,
+        "name": "C. Bassey",
+        "number": 3,
+        "pos": "D",
+        "grid": null
+       }
+      }
+     ],
+     "substitutes": []
+    }
+   ],
+   "players": [
+    {
+     "team": {
+      "id": 33,
+      "name": "Manchester United",
+      "logo": "https://media.api-sports.io/football/teams/33.png"
+     },
+     "players": [
+      {
+       "player": {
+        "id": 19220,
+        "name": "Mason Mount",
+        "photo": "https://media.api-sports.io/football/players/19220.png"
+       },
+       "statistics": [
+        {
+         "games": {
+          "number": 7,
+          "minutes": 90,
+          "position": "M",
+          "substitute": false
+         },
+         "fouls": {
+          "drawn": 3,
+          "committed": 1
+         },
+         "cards": {
+          "yellow": 1,
+          "red": 0
+         },
+         "penalty": {
+          "won": null,
+          "commited": null,
+          "scored": 0,
+          "missed": 0,
+          "saved": 0
+         }
+        }
+       ]
+      },
+      {
+       "player": {
+        "id": 526,
+        "name": "André Onana",
+        "photo": "https://media.api-sports.io/football/players/526.png"
+       },
+       "statistics": [
+        {
+         "games": {
+          "number": 24,
+          "minutes": 90,
+          "position": "G",
+          "substitute": false
+         },
+         "fouls": {
+          "drawn": null,
+          "committed": null
+         },
+         "cards": {
+          "yellow": 0,
+          "red": 0
+         },
+         "penalty": {
+          "won": null,
+          "commited": null,
+          "scored": 0,
+          "missed": 0,
+          "saved": 0
+         }
+        }
+       ]
+      },
+      {
+       "player": {
+        "id": 70100,
+        "name": "Joshua Zirkzee",
+        "photo": "https://media.api-sports.io/football/players/70100.png"
+       },
+       "statistics": [
+        {
+         "games": {
+          "number": 11,
+          "minutes": 29,
+          "position": "F",
+          "substitute": true
+         },
+         "fouls": {
+          "drawn": null,
+          "committed": null
+         },
+         "cards": {
+          "yellow": 0,
+          "red": 0
+         },
+         "penalty": {
+          "won": null,
+          "commited": null,
+          "scored": 0,
+          "missed": 0,
+          "saved": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "team": {
+      "id": 36,
+      "name": "Fulham",
+      "logo": "https://media.api-sports.io/football/teams/36.png"
+     },
+     "players": [
+      {
+       "player": {
+        "id": 152967,
+        "name": "Calvin Bassey",
+        "photo": "https://media.api-sports.io/football/players/152967.png"
+       },
+       "statistics": [
+        {
+         "games": {
+          "number": 3,
+          "minutes": 90,
+          "position": "D",
+          "substitute": false
+         },
+         "fouls": {
+          "drawn": null,
+          "committed": 2
+         },
+         "cards": {
+          "yellow": 1,
+          "red": 0
+         },
+         "penalty": {
+          "won": null,
+          "commited": 1,
+          "scored": 0,
+          "missed": 0,
+          "saved": 0
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "events": [
+    {
+     "team": {
+      "id": 33,
+      "name": "Manchester United",
+      "logo": "https://media.api-sports.io/football/teams/33.png"
+     },
+     "time": {
+      "elapsed": 18,
+      "extra": null
+     },
+     "type": "Card",
+     "detail": "Yellow Card",
+     "player": {
+      "id": 19220,
+      "name": "Mason Mount"
+     },
+     "assist": {
+      "id": null,
+      "name": null
+     },
+     "comments": "Simulation"
+    },
+    {
+     "team": {
+      "id": 36,
+      "name": "Fulham",
+      "logo": "https://media.api-sports.io/football/teams/36.png"
+     },
+     "time": {
+      "elapsed": 25,
+      "extra": null
+     },
+     "type": "Card",
+     "detail": "Yellow Card",
+     "player": {
+      "id": 152967,
+      "name": "Calvin Bassey"
+     },
+     "assist": {
+      "id": null,
+      "name": null
+     },
+     "comments": "Foul"
+    },
+    {
+     "team": {
+      "id": 33,
+      "name": "Manchester United",
+      "logo": "https://media.api-sports.io/football/teams/33.png"
+     },
+     "time": {
+      "elapsed": 61,
+      "extra": null
+     },
+     "type": "subst",
+     "detail": "Substitution 1",
+     "player": {
+      "id": 19220,
+      "name": "Mason Mount"
+     },
+     "assist": {
+      "id": 70100,
+      "name": null
+     },
+     "comments": null
+    },
+    {
+     "team": {
+      "id": 33,
+      "name": "Manchester United",
+      "logo": "https://media.api-sports.io/football/teams/33.png"
+     },
+     "time": {
+      "elapsed": 87,
+      "extra": null
+     },
+     "type": "Goal",
+     "detail": "Normal Goal",
+     "player": {
+      "id": 70100,
+      "name": "Joshua Zirkzee"
+     },
+     "assist": {
+      "id": null,
+      "name": null
+     },
+     "comments": null
+    },
+    {
+     "team": {
+      "id": 36,
+      "name": "Fulham",
+      "logo": "https://media.api-sports.io/football/teams/36.png"
+     },
+     "time": {
+      "elapsed": 90,
+      "extra": 3
+     },
+     "type": "Card",
+     "detail": "Yellow Card",
+     "player": {
+      "id": 999001,
+      "name": "Unknown Bench Player"
+     },
+     "assist": {
+      "id": null,
+      "name": null
+     },
+     "comments": "Argument"
+    }
+   ]
+  },
+  {
+   "fixture": {
+    "id": 1208022,
+    "date": "2024-08-17T11:30:00+00:00",
+    "referee": "T. Robinson, England",
+    "venue": {
+     "id": 494,
+     "name": "Portman Road",
+     "city": "Ipswich"
+    },
+    "status": {
+     "short": "FT",
+     "long": "Match Finished"
+    }
+   },
+   "league": {
+    "id": 39,
+    "name": "Premier League",
+    "country": "England",
+    "season": 2024,
+    "round": "Regular Season - 1",
+    "logo": "https://media.api-sports.io/football/leagues/39.png",
+    "flag": "https://media.api-sports.io/flags/gb-eng.svg"
+   },
+   "teams": {
+    "home": {
+     "id": 57,
+     "name": "Ipswich",
+     "logo": "https://media.api-sports.io/football/teams/57.png"
+    },
+    "away": {
+     "id": 40,
+     "name": "Liverpool",
+     "logo": "https://media.api-sports.io/football/teams/40.png"
+    }
+   },
+   "goals": {
+    "home": 0,
+    "away": 2
+   },
+   "lineups": [
+    {
+     "team": {
+      "id": 57,
+      "name": "Ipswich",
+      "logo": "https://media.api-sports.io/football/teams/57.png"
+     },
+     "coach": {
+      "id": 3001,
+      "name": "K. McKenna",
+      "photo": null
+     },
+     "startXI": [
+      {
+       "player": {
+        "id": 5001,
+        "name": "L. Delap",
+        "number": 19,
+        "pos": "F",
+        "grid": null
+       }
+      }
+     ],
+     "substitutes": []
+    },
+    {
+     "team": {
+      "id": 40,
+      "name": "Liverpool",
+      "logo": "https://media.api-sports.io/football/teams/40.png"
+     },
+     "coach": {
+      "id": 3002,
+      "name": "A. Slot",
+      "photo": null
+     },
+     "startXI": [
+      {
+       "player": {
+        "id": 306,
+        "name": "M. Salah",
+        "number": 11,
+        "pos": "F",
+        "grid": null
+       }
+      }
+     ],
+     "substitutes": []
+    }
+   ],
+   "players": [
+    {
+     "team": {
+      "id": 57,
+      "name": "Ipswich",
+      "logo": "https://media.api-sports.io/football/teams/57.png"
+     },
+     "players": [
+      {
+       "player": {
+        "id": 5001,
+        "name": "Liam Delap",
+        "photo": "https://media.api-sports.io/football/players/5001.png"
+       },
+       "statistics": [
+        {
+         "games": {
+          "number": 19,
+          "minutes": 90,
+          "position": "F",
+          "substitute": false
+         },
+         "fouls": {
+          "drawn": 1,
+          "committed": null
+         },
+         "cards": {
+          "yellow": 0,
+          "red": 0
+         },
+         "penalty": {
+          "won": null,
+          "commited": null,
+          "scored": 0,
+          "missed": 0,
+          "saved": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "team": {
+      "id": 40,
+      "name": "Liverpool",
+      "logo": "https://media.api-sports.io/football/teams/40.png"
+     },
+     "players": [
+      {
+       "player": {
+        "id": 306,
+        "name": "Mohamed Salah",
+        "photo": "https://media.api-sports.io/football/players/306.png"
+       },
+       "statistics": [
+        {
+         "games": {
+          "number": 11,
+          "minutes": 90,
+          "position": "F",
+          "substitute": false
+         },
+         "fouls": {
+          "drawn": 2,
+          "committed": null
+         },
+         "cards": {
+          "yellow": 0,
+          "red": 0
+         },
+         "penalty": {
+          "won": 1,
+          "commited": null,
+          "scored": 0,
+          "missed": 0,
+          "saved": 0
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "events": [
+    {
+     "team": {
+      "id": 40,
+      "name": "Liverpool",
+      "logo": "https://media.api-sports.io/football/teams/40.png"
+     },
+     "time": {
+      "elapsed": 48,
+      "extra": null
+     },
+     "type": "Var",
+     "detail": "Penalty cancelled",
+     "player": {
+      "id": 306,
+      "name": "Mohamed Salah"
+     },
+     "assist": {
+      "id": null,
+      "name": null
+     },
+     "comments": null
+    },
+    {
+     "team": {
+      "id": 40,
+      "name": "Liverpool",
+      "logo": "https://media.api-sports.io/football/teams/40.png"
+     },
+     "time": {
+      "elapsed": 60,
+      "extra": null
+     },
+     "type": "Goal",
+     "detail": "Normal Goal",
+     "player": {
+      "id": 306,
+      "name": "Mohamed Salah"
+     },
+     "assist": {
+      "id": null,
+      "name": null
+     },
+     "comments": null
+    }
+   ]
+  }
+ ]
+}

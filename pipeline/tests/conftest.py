@@ -56,20 +56,24 @@ def _db_reset():
 
 @pytest.fixture
 def db(_db_reset):
-    """Autocommit connection to the local database, with every public table emptied first."""
+    """Autocommit connection to the local database; every public table is emptied before and after."""
     import psycopg
 
     _assert_local(LOCAL_DB_URL)
     conn = psycopg.connect(LOCAL_DB_URL, autocommit=True)
+    _truncate_public(conn)
+    yield conn
+    # Empty again afterwards so test rows never linger as fake "cached" data for local runs.
+    _truncate_public(conn)
+    conn.close()
+
+
+def _truncate_public(conn) -> None:
     tables = [
         r[0]
-        for r in conn.execute(
-            "select tablename from pg_tables where schemaname = 'public'"
-        ).fetchall()
+        for r in conn.execute("select tablename from pg_tables where schemaname = 'public'").fetchall()
     ]
     if tables:
         conn.execute(
             "truncate " + ", ".join(f'public."{t}"' for t in tables) + " restart identity cascade"
         )
-    yield conn
-    conn.close()
