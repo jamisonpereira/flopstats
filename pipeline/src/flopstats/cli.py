@@ -57,3 +57,21 @@ def fetch_season(
     ids = [f["fixture"]["id"] for f in fixtures]
     details = api.fixtures_by_ids(ids)
     typer.echo(f"league {league} season {season}: {len(fixtures)} fixtures, {len(details)} with details")
+
+
+@api_app.command("build-season")
+def build_season_cmd(
+    league: int = typer.Option(..., help="API-Football league id (39 = Premier League)"),
+    season: int = typer.Option(..., help="Season start year, e.g. 2024"),
+) -> None:
+    """Build the clean football tables for a season from stored raw responses (no HTTP)."""
+    from flopstats.apifootball import build
+
+    report = build.build_season(_connect(_settings()), league, season)
+    typer.echo(f"league {league} season {season}:")
+    for table, n in sorted(report.counts.items()):
+        typer.echo(f"  {table}: {n}")
+    total = report.counts.get("match_events", 0)
+    typer.echo(f"  events with null player: {report.null_player_events} of {total} ({report.null_player_pct:.2f}%)")
+    typer.echo(f"  player links needing review: {report.needs_review}")
+    typer.echo(f"  fixtures missing details: {report.missing_details}")

@@ -19,6 +19,7 @@ import psycopg
 from psycopg import sql
 
 from flopstats.apifootball.client import params_hash
+from flopstats.apifootball.linking import link_event_player
 
 SOURCE = "api-football"
 
@@ -26,11 +27,24 @@ SOURCE = "api-football"
 @dataclass
 class BuildReport:
     counts: dict[str, int] = field(default_factory=lambda: defaultdict(int))
-    needs_review: int = 0  # events whose player could not be linked
+    needs_review: int = 0  # events whose player could not be linked (a review item exists)
     missing_details: int = 0  # fixtures in the season list with no stored detail
+    null_player_events: int = 0  # events left with player_id null (includes team-only events)
 
     def __post_init__(self):
         self.counts = defaultdict(int, self.counts)
+        self._seen: dict[str, set] = defaultdict(set)
+
+    def see(self, table: str, key) -> None:
+        """Count a row once per build, however many fixtures touch it."""
+        if key not in self._seen[table]:
+            self._seen[table].add(key)
+            self.counts[table] += 1
+
+    @property
+    def null_player_pct(self) -> float:
+        total = self.counts.get("match_events", 0)
+        return 100.0 * self.null_player_events / total if total else 0.0
 
 
 def normalize_referee(name: str) -> str:
@@ -154,9 +168,9 @@ def build_season(conn: psycopg.Connection, league_api_id: int, season_year: int)
                 "select id from seasons where league_id = %s and year = %s", (league_id, season_year)
             ).fetchone()
         season_id = season_id[0]
-        report.counts["countries"] += 1
-        report.counts["leagues"] += 1
-        report.counts["seasons"] += 1
+        report.see("countries", country_id)
+        report.see("leagues", league_id)
+        report.see("seasons", season_id)
 
     home_venues: dict[int, Counter] = defaultdict(Counter)
     for listed in season_list:
@@ -192,8 +206,8 @@ def _build_fixture(conn, f: dict, season_id: int, country_id: int, report: Build
             "insert into team_seasons (team_id, season_id) values (%s, %s) on conflict do nothing",
             (team_ids[t["id"]], season_id),
         )
-        report.counts["teams"] += 1
-        report.counts["team_seasons"] += 1
+        report.see("teams", team_ids[t["id"]])
+        report.see("team_seasons", (team_ids[t["id"]], season_id))
 
     venue_id = None
     v = fx.get("venue") or {}
@@ -202,7 +216,7 @@ def _build_fixture(conn, f: dict, season_id: int, country_id: int, report: Build
             conn, "venue", v["id"], "venues", {"name": v.get("name") or "?", "city": v.get("city"), "country_id": country_id}
         )
         home_venues[team_ids[f["teams"]["home"]["id"]]][venue_id] += 1
-        report.counts["venues"] += 1
+        report.see("venues", venue_id)
 
     referee_id = None
     if fx.get("referee"):
@@ -212,7 +226,7 @@ def _build_fixture(conn, f: dict, season_id: int, country_id: int, report: Build
                 "insert into referees (name) values (%s) on conflict (name) do update set name = excluded.name returning id",
                 (name,),
             ).fetchone()[0]
-            report.counts["referees"] += 1
+            report.see("referees", referee_id)
 
     coach_ids: dict[int, int] = {}
     for lineup in f.get("lineups") or []:
@@ -221,7 +235,7 @@ def _build_fixture(conn, f: dict, season_id: int, country_id: int, report: Build
             coach_ids[lineup["team"]["id"]] = _upsert_ref(
                 conn, "coach", c["id"], "coaches", {"name": c.get("name") or "?", "photo_source_url": c.get("photo")}
             )
-            report.counts["coaches"] += 1
+            report.see("coaches", coach_ids[lineup["team"]["id"]])
 
     home_api, away_api = f["teams"]["home"]["id"], f["teams"]["away"]["id"]
     goals = f.get("goals") or {}
@@ -242,7 +256,7 @@ def _build_fixture(conn, f: dict, season_id: int, country_id: int, report: Build
             "goals_away": goals.get("away"),
         },
     )
-    report.counts["matches"] += 1
+    report.see("matches", match_id)
 
     # Players: lineup gives starter/number/position; the players block gives full name + stats.
     lineup_info: dict[int, dict] = {}
@@ -273,7 +287,7 @@ def _build_fixture(conn, f: dict, season_id: int, country_id: int, report: Build
             conn, "player", api_pid, "players",
             {"display_name": pl.get("name") or li.get("name") or "?", "photo_source_url": pl.get("photo")},
         )
-        report.counts["players"] += 1
+        report.see("players", player_id)
         number = li.get("number") if li.get("number") is not None else games.get("number")
         position = li.get("pos") or games.get("position")
         conn.execute(
@@ -284,7 +298,7 @@ def _build_fixture(conn, f: dict, season_id: int, country_id: int, report: Build
             "is distinct from (excluded.shirt_number, excluded.position)",
             (player_id, team_ids[team_api], season_id, number, position),
         )
-        report.counts["player_team_seasons"] += 1
+        report.see("player_team_seasons", (player_id, team_ids[team_api], season_id))
         fouls, cards, pen = st.get("fouls") or {}, st.get("cards") or {}, st.get("penalty") or {}
         cols = {
             "team_id": team_ids[team_api],
@@ -315,28 +329,38 @@ def _build_fixture(conn, f: dict, season_id: int, country_id: int, report: Build
             ),
             [match_id, player_id, *cols.values()],
         )
-        report.counts["match_lineups"] += 1
+        report.see("match_lineups", (match_id, player_id))
 
     for event in f.get("events") or []:
         team_api = (event.get("team") or {}).get("id")
         if team_api not in team_ids:
             continue
-        player_api = (event.get("player") or {}).get("id")
+        player = event.get("player") or {}
         assist_api = (event.get("assist") or {}).get("id")
-        # Until Task 6's link_event_player exists, link by API player id only.
-        player_id = _ref_id(conn, "player", player_api)
-        assist_id = _ref_id(conn, "player", assist_api)
-        if player_api is not None and player_id is None:
-            report.needs_review += 1
         t = event.get("time") or {}
-        conn.execute(
-            "insert into match_events (match_id, team_id, player_id, assist_player_id, minute, extra_minute, "
-            "type, detail, comments, source_hash) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
-            "on conflict (source_hash) do update set player_id = excluded.player_id, "
-            "assist_player_id = excluded.assist_player_id where (match_events.player_id, "
-            "match_events.assist_player_id) is distinct from (excluded.player_id, excluded.assist_player_id)",
-            (match_id, team_ids[team_api], player_id, assist_id, t.get("elapsed"), t.get("extra"),
-             event.get("type") or "?", event.get("detail"), event.get("comments"),
-             event_source_hash(fx["id"], event)),
+        source_hash = event_source_hash(fx["id"], event)
+        row = conn.execute(
+            "insert into match_events (match_id, team_id, minute, extra_minute, type, detail, comments, "
+            "source_hash) values (%s, %s, %s, %s, %s, %s, %s, %s) on conflict (source_hash) do nothing "
+            "returning id",
+            (match_id, team_ids[team_api], t.get("elapsed"), t.get("extra"), event.get("type") or "?",
+             event.get("detail"), event.get("comments"), source_hash),
+        ).fetchone()
+        event_id = row[0] if row else conn.execute(
+            "select id from match_events where source_hash = %s", (source_hash,)
+        ).fetchone()[0]
+        link = link_event_player(
+            conn, match_id, team_ids[team_api], player.get("id"), player.get("name"), event_id=event_id
         )
-        report.counts["match_events"] += 1
+        if link.player_id is None and (player.get("id") is not None or player.get("name")):
+            report.needs_review += 1
+        if link.player_id is None:
+            report.null_player_events += 1
+        # Assists (and the incoming player on a substitution) link by API id only.
+        assist_id = _ref_id(conn, "player", assist_api)
+        conn.execute(
+            "update match_events set player_id = %s, assist_player_id = %s where id = %s "
+            "and (player_id, assist_player_id) is distinct from (%s::bigint, %s::bigint)",
+            (link.player_id, assist_id, event_id, link.player_id, assist_id),
+        )
+        report.see("match_events", event_id)

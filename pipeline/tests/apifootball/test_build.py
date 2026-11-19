@@ -140,3 +140,37 @@ def test_referee_suffix_stripped_in_db(raw):
     build_season(raw, 39, 2024)
     names = {r[0] for r in raw.execute("select name from referees").fetchall()}
     assert names == {"R. Jones", "T. Robinson"}
+
+
+def test_build_unlinkable_event_player_creates_review_item(raw):
+    build_season(raw, 39, 2024)
+    build_season(raw, 39, 2024)  # a rebuild does not add a second item
+    rows = raw.execute(
+        "select r.kind, r.subject_type, r.payload->>'name' from review_items r "
+        "join match_events e on e.id = r.subject_id where e.comments = 'Argument'"
+    ).fetchall()
+    assert rows == [("player_link", "match_event", "Unknown Bench Player")]
+
+
+def test_build_links_event_player_by_lineup_name_when_api_id_missing(raw):
+    body = json.loads((FIXTURES / "fixtures_details.json").read_text())
+    ev = body["response"][1]["events"][1]  # Salah goal
+    ev["player"]["id"] = None
+    raw.execute("update api_raw set body = %s where params ? 'ids'", (Jsonb(body),))
+    report = build_season(raw, 39, 2024)
+    name = _one(raw, "select p.display_name from match_events e join players p on p.id = e.player_id where e.type = 'Goal' and e.minute = 60")[0]
+    assert name == "Mohamed Salah"
+    assert report.null_player_events == 1  # only the unknown bench player
+    assert report.null_player_pct == pytest.approx(100 / 7)
+
+
+def test_report_counts_distinct_rows(raw):
+    body = json.loads((FIXTURES / "fixtures_details.json").read_text())
+    body["response"][1]["fixture"]["referee"] = "R. Jones"  # same referee in both matches
+    raw.execute("update api_raw set body = %s where params ? 'ids'", (Jsonb(body),))
+    report = build_season(raw, 39, 2024)
+    assert report.counts["referees"] == 1
+    counts = _counts(raw)
+    for table in ("teams", "players", "venues", "referees", "coaches", "matches", "match_lineups",
+                  "match_events", "team_seasons", "player_team_seasons"):
+        assert report.counts[table] == counts[table], table
