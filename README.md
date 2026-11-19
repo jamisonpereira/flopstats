@@ -13,3 +13,12 @@ open -e .env    # paste each value after its "=", no quotes or spaces, then save
 ```
 
 `.env` is git-ignored, and coding agents are told never to read it (see `AGENTS.md`). The master copy of the keys is in 1Password ("Flopstats keys").
+
+## Pipeline
+
+Run everything from the repo root (so `.env` is found):
+
+```bash
+uv run flopstats verify-setup   # one cheap call per service, prints OK/FAIL/SKIP, never values
+uv run pytest pipeline/tests
+```
