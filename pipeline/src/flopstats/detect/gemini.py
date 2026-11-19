@@ -80,6 +80,31 @@ def _image_block(path: Path, resolution: str) -> dict:
             "mime_type": "image/png", "resolution": resolution}
 
 
+def post_json(http: httpx.Client, url: str, body: dict, key: str, sleep: Callable[[float], None]) -> dict:
+    """POST with retries: 429 waits as long as the API asks; 5xx/transport errors back off."""
+    server_errors = rate_limits = 0
+    while True:
+        try:
+            resp = http.post(url, json=body, headers={"x-goog-api-key": key})
+        except httpx.TransportError as exc:
+            server_errors += 1
+            if server_errors > RETRIES:
+                raise DecisionError(f"request failed ({type(exc).__name__})") from None
+            sleep(2.0 ** (server_errors - 1))
+            continue
+        if resp.status_code == 429 and rate_limits < RATE_LIMIT_RETRIES:
+            rate_limits += 1
+            sleep(_retry_after_s(resp, default=2.0 ** min(rate_limits, 6)) + 1.0)
+            continue
+        if resp.status_code in (500, 502, 503, 504) and server_errors < RETRIES:
+            server_errors += 1
+            sleep(2.0 ** (server_errors - 1))
+            continue
+        if resp.status_code != 200:
+            raise DecisionError(f"HTTP {resp.status_code} ({_error_detail(resp)})")
+        return resp.json()
+
+
 class _DecisionsClient:
     def __init__(self, api_key: str, model: str, usd_per_m_input: Decimal, http: httpx.Client | None,
                  sleep: Callable[[float], None]):
@@ -91,27 +116,7 @@ class _DecisionsClient:
 
     def decide(self, blocks: list[dict], questions: dict) -> dict:
         body = {"model": self.model, "input": blocks, "questions": questions}
-        server_errors = rate_limits = 0
-        while True:
-            try:
-                resp = self._http.post(DECISIONS_URL, json=body, headers={"x-goog-api-key": self._key})
-            except httpx.TransportError as exc:
-                server_errors += 1
-                if server_errors > RETRIES:
-                    raise DecisionError(f"decisions request failed ({type(exc).__name__})") from None
-                self._sleep(2.0 ** (server_errors - 1))
-                continue
-            if resp.status_code == 429 and rate_limits < RATE_LIMIT_RETRIES:
-                rate_limits += 1
-                self._sleep(_retry_after_s(resp, default=2.0 ** min(rate_limits, 6)) + 1.0)
-                continue
-            if resp.status_code in (500, 502, 503, 504) and server_errors < RETRIES:
-                server_errors += 1
-                self._sleep(2.0 ** (server_errors - 1))
-                continue
-            if resp.status_code != 200:
-                raise DecisionError(f"decisions HTTP {resp.status_code} ({_error_detail(resp)})")
-            return resp.json()
+        return post_json(self._http, DECISIONS_URL, body, self._key, self._sleep)
 
     def usd(self, data: dict) -> Decimal:
         tokens = Decimal((data.get("usage") or {}).get("total_input_tokens") or 0)
@@ -173,3 +178,115 @@ class DecisionClockReader:
         second = int(a["second"]["choice"][1:])
         conf = float(a["visible"]["noul"]) * float(a["minute"]["confidence"]) * float(a["second"]["confidence"])
         return ClockReading(minute=minute, second=second, confidence=conf)
+
+
+# --- verifier (generateContent with structured JSON output) ------------------------------
+# Docs: https://ai.google.dev/gemini-api/docs/structured-output (responseMimeType +
+# responseJsonSchema) and https://ai.google.dev/gemini-api/docs/video-understanding
+# (inline_data video). Usage: usageMetadata.promptTokenCount (input),
+# candidatesTokenCount + thoughtsTokenCount (billed as output).
+
+GENERATE_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+
+
+def generate_url(model: str) -> str:
+    return f"{GENERATE_BASE}/{model}:generateContent"
+
+
+class InvalidModelOutput(Exception):
+    def __init__(self, message: str, usd: Decimal):
+        super().__init__(message)
+        self.usd = usd
+
+
+def _inline_refs(schema: dict) -> dict:
+    """Pydantic emits $defs/$ref; give the API one self-contained schema."""
+    defs = schema.pop("$defs", {})
+
+    def walk(node):
+        if isinstance(node, dict):
+            if "$ref" in node:
+                return walk(dict(defs[node["$ref"].rsplit("/", 1)[-1]]))
+            return {k: walk(v) for k, v in node.items() if k != "title"}
+        if isinstance(node, list):
+            return [walk(v) for v in node]
+        return node
+
+    return walk(schema)
+
+
+VERIFY_PROMPT_V1 = """You are reviewing a short clip from a {home} (home) vs {away} (away) football match.
+Decide whether a player in this clip flops: dives without contact, exaggerates light contact,
+feigns an injury, or stays down to waste time. Genuine fouls with proportionate reactions and
+genuine injuries are NOT flops.
+
+Answer with JSON only, following the schema:
+- is_flop, type (dive / exaggeration / feigned_injury / time_wasting, or null), confidence 0-1.
+- start_s / end_s: when the flop starts and ends, in seconds from the start of this clip.
+- is_replay: true if this is a replay or slow-motion repeat rather than live play.
+- flopper: team (home/away), shirt number, name if you can tell, and your confidence.
+- others: other players involved (e.g. the alleged fouler).
+- attrs: time on the ground (s), rolls, fake pain 1-10, body part clutched vs where contact
+  happened, contact level (none/light/real), miracle recovery and what triggered it, and the
+  rough pitch position (x, y on 0-100 with the attacking team going left to right) with confidence.
+- ref_decision: none / foul / yellow / red / penalty.
+{kits}
+Lineups (use them to name players by shirt number):
+{lineups}
+"""
+
+PROMPTS = {"v1": VERIFY_PROMPT_V1}
+
+
+class GeminiVerifier:
+    def __init__(self, api_key: str, model: str, *, usd_per_m_input: Decimal, usd_per_m_output: Decimal,
+                 prompt_version: str = "v1", http: httpx.Client | None = None,
+                 sleep: Callable[[float], None] = time.sleep):
+        self.name = model
+        self._key = api_key
+        self._in = Decimal(usd_per_m_input)
+        self._out = Decimal(usd_per_m_output)
+        self.prompt_version = prompt_version
+        self._http = http or httpx.Client(timeout=300.0)
+        self._sleep = sleep
+        from flopstats.detect.verify import ModelAnswer
+
+        self._schema = _inline_refs(ModelAnswer.model_json_schema())
+
+    def _prompt(self, context) -> str:
+        lineup = "\n".join(f"- {p.team}: #{p.shirt_number if p.shirt_number is not None else '?'} {p.name}"
+                            for p in context.lineups) or "- (not available)"
+        kits = f"Kits: {context.kit_notes}\n" if context.kit_notes else ""
+        return PROMPTS[self.prompt_version].format(home=context.home_team, away=context.away_team,
+                                                   lineups=lineup, kits=kits)
+
+    def _usd(self, data: dict) -> Decimal:
+        u = data.get("usageMetadata") or {}
+        out_tokens = (u.get("candidatesTokenCount") or 0) + (u.get("thoughtsTokenCount") or 0)
+        return (Decimal(u.get("promptTokenCount") or 0) * self._in + Decimal(out_tokens) * self._out) / Decimal(1_000_000)
+
+    def verify(self, segment: Path, context):
+        from pydantic import ValidationError
+
+        from flopstats.detect.verify import ModelAnswer, VerifyResult
+
+        body = {
+            "contents": [{"role": "user", "parts": [
+                {"inline_data": {"mime_type": "video/mp4", "data": base64.b64encode(Path(segment).read_bytes()).decode()}},
+                {"text": self._prompt(context)},
+            ]}],
+            "generationConfig": {"responseMimeType": "application/json", "responseJsonSchema": self._schema,
+                                 "temperature": 0},
+        }
+        spent = Decimal(0)
+        problem = ""
+        for _attempt in range(2):  # one retry on invalid output
+            data = post_json(self._http, generate_url(self.name), body, self._key, self._sleep)
+            spent += self._usd(data)
+            try:
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                answer = ModelAnswer.model_validate_json(text)
+                return VerifyResult(**answer.model_dump(), usd=spent, model=self.name)
+            except (KeyError, IndexError, TypeError, ValidationError, ValueError) as exc:
+                problem = type(exc).__name__
+        raise InvalidModelOutput(f"{self.name}: invalid output twice ({problem})", usd=spent)
