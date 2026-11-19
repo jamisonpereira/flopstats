@@ -20,7 +20,8 @@ web/playwright-report/
 data/
 *.mp4
 *.m3u8
-*.ts
+# HLS video segments only; TypeScript in web/ must stay tracked
+data/**/*.ts
 .superpowers/
 
 # Supabase local
