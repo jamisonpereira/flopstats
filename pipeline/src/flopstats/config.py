@@ -7,7 +7,8 @@ from __future__ import annotations
 import re
 from decimal import Decimal
 from functools import lru_cache
-from typing import Any
+from pathlib import Path
+from typing import Any, Literal
 
 from pydantic import Field, SecretStr
 from pydantic_settings import (
@@ -52,6 +53,8 @@ class Settings(BaseSettings):
     footballia_username: SecretStr | None = None
     footballia_password: SecretStr | None = None
     budget_usd: Decimal = Field(default=Decimal("500"), validation_alias="FLOPSTATS_BUDGET_USD")
+    storage_backend: Literal["supabase", "local"] = "supabase"
+    storage_local_root: Path = Path("data/storage")
     verifier_keys: dict[str, SecretStr] = Field(default_factory=dict)
 
     @classmethod
