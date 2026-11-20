@@ -1,6 +1,6 @@
 # Divestats — Stage 2 site design
 
-*Date: 2026-11-20 · Owner: Jamison · Status: draft for review*
+*Date: 2026-11-20 · Owner: Jamison · Status: approved by Jamison, 2026-11-20*
 *Feeds: the Stage 2 plan (public site). Builds on `docs/superpowers/specs/2026-11-19-flopstats-design.md` (the "spec").*
 
 Mock-ups live in `docs/design/mockups/` (open the `.html` files in a browser). All names, clubs and numbers in them are invented.
