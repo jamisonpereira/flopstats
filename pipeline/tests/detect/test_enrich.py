@@ -127,3 +127,8 @@ def test_review_cap_counts_this_match_in_this_run(world, db):
     second = enrich.persist(db, world["run"], world["cand"], R(conf=0.6, shirt=9, start=30.0), SYNC, world["match"], cfg)
     statuses = dict(db.execute("select id, status from incidents").fetchall())
     assert statuses == {first: "review", second: "ai_judged"}
+
+
+def test_persist_records_ai_status(world, db):
+    iid = enrich.persist(db, world["run"], world["cand"], R(conf=0.6), SYNC, world["match"], CFG)
+    assert _one(db, "select ai_status from incidents where id = %s", iid) == "review"

@@ -249,3 +249,30 @@ def run_status(run: int = typer.Option(...)) -> None:
     typer.echo(f"open reviews: {s['open_reviews']}")
     for f in s["failed"]:
         typer.echo(f"  failed {f['kind']} {f['key']}: {f['error']}")
+
+
+@app.command("report")
+def report_cmd(
+    run: int = typer.Option(...),
+    matches_total: int = typer.Option(380, help="Matches to project the cost for"),
+    precision_target: float = typer.Option(0.80),
+    recall_target: float = typer.Option(0.90),
+) -> None:
+    """Pass criteria for a run: precision, known-dive recall, verifier comparison, cost projection."""
+    from flopstats import report
+
+    conn = _connect(_settings())
+    p = report.precision(conn, run)
+    r = report.known_dive_recall(conn, run)
+    typer.echo(f"precision: {p.agreed}/{p.reviewed} = {p.rate:.0%} (target {precision_target:.0%})")
+    typer.echo(f"known-dive recall: {r.found}/{r.total} = {r.rate:.0%} (target {recall_target:.0%})")
+    for m in r.missed:
+        typer.echo(f"  missed: match {m['match_id']} {m['minute']}'{'+' + str(m['extra_minute']) if m['extra_minute'] else ''} "
+                   f"{m['type']} {m['detail'] or ''} {m['comments'] or ''} {m['player'] or ''}".rstrip())
+    typer.echo("verifiers:")
+    for v in report.verifier_comparison(conn, run):
+        typer.echo(f"  {v.model}: agreed {v.agreed_with_jamison}/{v.reviewed}, ${v.usd_per_match:.4f} per match")
+    typer.echo(f"cost projection for {matches_total} matches: ${report.cost_projection(conn, run, matches_total)}")
+    ok_p = p.reviewed > 0 and p.rate >= precision_target
+    ok_r = r.total > 0 and r.rate >= recall_target
+    typer.echo(f"{'PASS' if ok_p else 'FAIL'} precision  ·  {'PASS' if ok_r else 'FAIL'} known-dive recall")

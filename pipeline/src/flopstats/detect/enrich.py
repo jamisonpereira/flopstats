@@ -146,13 +146,13 @@ def persist(conn: psycopg.Connection, run_id: int, candidate: CandidateRef, resu
         incident_id = conn.execute(
             """
             insert into incidents (run_id, match_id, video_id, candidate_id, type, video_start_s, video_end_s,
-              game_minute, game_second, team_id, confidence, status, attrs, ref_decision, ref_penalized_team_id,
+              game_minute, game_second, team_id, confidence, status, ai_status, attrs, ref_decision, ref_penalized_team_id,
               consequence, sim_score, dedupe_key)
-            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             on conflict (run_id, video_id, dedupe_key) do nothing returning id
             """,
             (run_id, match.id, candidate.video_id, candidate.id, result.type or "dive", v_start, max(v_end, v_start),
-             gt[0] if gt else None, gt[1] if gt else None, team_id, result.confidence, st,
+             gt[0] if gt else None, gt[1] if gt else None, team_id, result.confidence, st, st,
              Jsonb(result.attrs.model_dump(exclude_none=True)), result.ref_decision,
              opponent if result.ref_decision != "none" else None, Jsonb(cons) if cons else None, score, key),
         ).fetchone()
