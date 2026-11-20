@@ -1,0 +1,18 @@
+{
+  "window_len_s": 20,
+  "window_step_s": 10,
+  "candidate_threshold": 0.35,
+  "prior_weight": 0.3,
+  "confirm_threshold": 0.85,
+  "review_threshold": 0.5,
+  "review_cap": null,
+  "player_min_conf": 0.8,
+  "scorer_model": "gemini-decision-1",
+  "verifier_models": ["gemini-3.1-pro-preview", "gemini-3.8-flash"],
+  "primary_verifier": "gemini-3.1-pro-preview",
+  "prices": {
+    "gemini-decision-1": {"input": 0.10, "output": 0},
+    "gemini-3.1-pro-preview": {"input": 2.00, "output": 12.00},
+    "gemini-3.8-flash": {"input": 0.75, "output": 3.75}
+  }
+}
