@@ -67,6 +67,8 @@ class RunConfig(BaseModel):
     # Working copy the scorer's windows are copied from (verification and clips use the original).
     work_fps: float = Field(default=25, gt=0)
     work_height: int = Field(default=720, gt=0)
+    # Longest candidate sent to the verifiers; longer hot stretches are split (None: no limit).
+    max_candidate_s: float | None = Field(default=40, gt=0)
 
 
 @dataclass
@@ -376,7 +378,7 @@ class _Ctx:
             rows = [cand_mod.WindowRow(s, e, sc, pr) for s, e, sc, pr in self.conn.execute(
                 "select start_s, end_s, coalesce(score, 0), prior from windows where run_id = %s and video_id = %s", (self.run_id, self.video_id))]
             with self.conn.transaction():
-                for c in cand_mod.select(rows, self.cfg.candidate_threshold, self.cfg.prior_weight):
+                for c in cand_mod.select(rows, self.cfg.candidate_threshold, self.cfg.prior_weight, self.cfg.max_candidate_s):
                     self.conn.execute(
                         "insert into candidates (run_id, video_id, start_s, end_s, final_score, status) values (%s, %s, %s, %s, %s, 'pending')",
                         (self.run_id, self.video_id, c.start_s, c.end_s, c.final_score))

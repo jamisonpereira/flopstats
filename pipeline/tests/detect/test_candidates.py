@@ -44,3 +44,20 @@ def test_below_threshold_not_selected():
 def test_unsorted_input_is_handled():
     rows = [W(20, 0.9), W(0, 0.1), W(10, 0.8)]
     assert [(c.start_s, c.end_s) for c in select(rows, 0.6, 0.0)] == [(10, 40)]
+
+
+def test_a_long_hot_stretch_is_split_into_short_candidates():
+    # Pilot: event priors chained windows into 190-280 s candidates; a verifier names one flop per
+    # clip, so Chilwell's dive (Liverpool-Chelsea) was lost inside a 280 s candidate.
+    rows = [W(s, 0.9) for s in range(0, 280, 10)]  # windows 0-20 ... 270-290, all hot
+    cands = select(rows, threshold=0.6, prior_weight=0.0, max_len_s=40)
+    assert all(c.end_s - c.start_s <= 40 for c in cands)
+    covered = sorted((c.start_s, c.end_s) for c in cands)
+    assert covered[0][0] == 0 and covered[-1][1] == 290
+    assert all(b[0] <= a[1] for a, b in zip(covered, covered[1:]))  # no gaps between pieces
+    assert covered[:2] == [(0, 40), (30, 70)] and len(cands) == 10  # pieces overlap by one window step
+
+
+def test_max_len_keeps_short_runs_unchanged():
+    rows = [W(0, 0.9), W(10, 0.9)]
+    assert [(c.start_s, c.end_s) for c in select(rows, 0.6, 0.0, max_len_s=40)] == [(0, 30)]
