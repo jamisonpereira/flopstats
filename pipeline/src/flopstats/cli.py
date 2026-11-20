@@ -208,8 +208,11 @@ def run_season(
     season: int = typer.Option(..., help="Season start year, e.g. 2024"),
     limit: int = typer.Option(None, help="Process at most N matches"),
     urls: str = typer.Option(None, help="Comma-separated footballia URLs to restrict the run to"),
+    parallel: int = typer.Option(1, min=1, help="Matches processed at once (one's encode overlaps another's scoring)"),
 ) -> None:
     """Process every footballia-listed match of a season, in date order; stops on budget."""
+    import threading
+
     from flopstats import runner
     from flopstats.footballia import catalog
     from flopstats.footballia.download import new_client
@@ -227,18 +230,37 @@ def run_season(
         entries = entries[:limit]
     deps = _build_deps(settings, runner.load_config(conn, run))
     summary: dict[str, int] = {}
-    for e in entries:
-        try:
-            rep = runner.process_match(conn, run, e.url, deps)
-        except Exception as exc:  # recorded on the step's job; carry on with the next match
-            typer.echo(f"{e.url}: error {type(exc).__name__}: {exc}", err=True)
-            summary["error"] = summary.get("error", 0) + 1
-            continue
-        summary[rep.status] = summary.get(rep.status, 0) + 1
-        typer.echo(f"{e.date} {e.home} v {e.away}: {rep.status} {rep.counts}")
-        if rep.status == "blocked_budget":
-            typer.echo("stopping: budget reached")
-            break
+    pending = list(entries)
+    lock, stop = threading.Lock(), threading.Event()
+
+    def worker(wconn) -> None:
+        while not stop.is_set():
+            with lock:
+                if not pending:
+                    return
+                e = pending.pop(0)
+            try:
+                rep = runner.process_match(wconn, run, e.url, deps)
+            except Exception as exc:  # recorded on the step's job; carry on with the next match
+                with lock:
+                    typer.echo(f"{e.url}: error {type(exc).__name__}: {exc}", err=True)
+                    summary["error"] = summary.get("error", 0) + 1
+                continue
+            with lock:
+                summary[rep.status] = summary.get(rep.status, 0) + 1
+                typer.echo(f"{e.date} {e.home} v {e.away}: {rep.status} {rep.counts}")
+                if rep.status == "blocked_budget" and not stop.is_set():
+                    stop.set()
+                    typer.echo("stopping: budget reached")
+
+    if parallel == 1:
+        worker(conn)
+    else:  # each worker has its own connection (psycopg connections aren't shared across threads)
+        threads = [threading.Thread(target=worker, args=(conn if i == 0 else _connect(settings),)) for i in range(parallel)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
     typer.echo(f"season {label}: {summary}")
 
 

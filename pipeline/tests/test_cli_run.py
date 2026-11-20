@@ -89,3 +89,50 @@ def test_build_deps_scores_windows_from_a_working_copy(tmp_path, monkeypatch):
     settings = Settings(_env_file=None, gemini_key=SecretStr("k"), storage_backend="local", storage_local_root=str(tmp_path))
     deps = cli._build_deps(settings, runner.RunConfig(**CFG))
     assert deps.working_copy is ffmpeg.working_copy and deps.window is ffmpeg.window
+
+
+def _season_entries(n):
+    return [CatalogEntry(url=f"https://footballia.eu/matches/m{i}", home="A", away="B", date=date(2024, 9, i),
+                         competition="Premier League", season="2024-2025") for i in range(1, n + 1)]
+
+
+def test_run_season_parallel_processes_each_match_once_two_at_a_time(db, settings, monkeypatch):
+    import threading
+    import time
+
+    _patch(monkeypatch, db, settings)
+    run_id = runner.create_run(db, "pilot", runner.RunConfig(**CFG))
+    entries = _season_entries(6)
+    monkeypatch.setattr("flopstats.footballia.catalog.list_season", lambda client, league, season, **kw: entries)
+    monkeypatch.setattr(cli, "_build_deps", lambda settings, cfg: object())
+    lock, state, done = threading.Lock(), {"now": 0, "peak": 0}, []
+
+    def process(conn, run, url, deps):
+        with lock:
+            state["now"] += 1
+            state["peak"] = max(state["peak"], state["now"])
+        time.sleep(0.05)
+        with lock:
+            state["now"] -= 1
+            done.append(url)
+        return runner.MatchReport("done")
+
+    monkeypatch.setattr(runner, "process_match", process)
+    r = CliRunner().invoke(cli.app, ["run", "season", "--run", str(run_id), "--season", "2024", "--parallel", "2"])
+    assert r.exit_code == 0, r.output
+    assert sorted(done) == sorted(e.url for e in entries) and state["peak"] == 2
+    assert "'done': 6" in r.output
+
+
+def test_run_season_parallel_stops_starting_matches_on_budget(db, settings, monkeypatch):
+    _patch(monkeypatch, db, settings)
+    run_id = runner.create_run(db, "pilot", runner.RunConfig(**CFG))
+    entries = _season_entries(6)
+    monkeypatch.setattr("flopstats.footballia.catalog.list_season", lambda client, league, season, **kw: entries)
+    monkeypatch.setattr(cli, "_build_deps", lambda settings, cfg: object())
+    started = []
+    monkeypatch.setattr(runner, "process_match",
+                        lambda conn, run, url, deps: started.append(url) or runner.MatchReport("blocked_budget"))
+    r = CliRunner().invoke(cli.app, ["run", "season", "--run", str(run_id), "--season", "2024", "--parallel", "2"])
+    assert r.exit_code == 0, r.output
+    assert len(started) <= 2 and "budget reached" in r.output
