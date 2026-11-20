@@ -136,3 +136,26 @@ def test_invalid_json_then_valid_on_retry(tmp_path):
     respx.post(generate_url("m")).mock(side_effect=[_gen("```oops"), _gen(_good_json())])
     r = GeminiVerifier(KEY, "m", usd_per_m_input=Decimal("1"), usd_per_m_output=Decimal("1")).verify(seg, CTX)
     assert r.is_flop and r.usd == Decimal(2 * 10_000 + 2 * 600) / 1_000_000  # both attempts paid
+
+
+def test_nul_characters_in_model_text_are_dropped(db, candidate, tmp_path):
+    # Pilot: a verifier returned the flopper name "Andr\u0000..."; Postgres text/jsonb can't hold NUL.
+    raw = json.dumps({"is_flop": True, "type": "dive", "confidence": 0.9, "start_s": 1, "end_s": 4,
+                      "flopper": {"team": "home", "shirt_number": 24, "name": "Andr\u0000é Onana"},
+                      "attrs": {"clutched_part": "kn\u0000ee"}, "others": [{"name": "\u0000"}]})
+    answer = verify.ModelAnswer.model_validate_json(raw)
+    assert answer.flopper.name == "André Onana"
+    assert answer.attrs.clutched_part == "knee"
+    res = VerifyResult(**answer.model_dump(), usd=Decimal("0.01"), model="m")
+    verify.run(db, candidate["candidate"], tmp_path / "seg.mp4", [FakeVerifier("m", res)], CTX, run_id=candidate["run"])
+    stored = db.execute("select answers->'flopper'->>'name' from verifications").fetchone()[0]
+    assert stored == "André Onana"
+
+
+def test_a_blocked_verifier_call_is_stored_not_raised(db, candidate, tmp_path):
+    from flopstats.detect.gemini import ContentBlocked
+    blocked = FakeVerifier("m", exc=ContentBlocked("HTTP 400 (prohibited_content: Input blocked)"))
+    out = verify.run(db, candidate["candidate"], tmp_path / "seg.mp4", [blocked], CTX, run_id=candidate["run"])
+    assert out == []
+    answers = db.execute("select answers from verifications").fetchone()[0]
+    assert answers["invalid"] is True and answers["blocked"] is True

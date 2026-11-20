@@ -143,10 +143,42 @@ def probe_duration_s(path: Path) -> float:
     return float(out.stdout.strip())
 
 
+class BadJoin(Exception):
+    pass
+
+
+JOIN_TIMESCALE = 90000
+JOIN_TOLERANCE_S = 2.0
+
+
+def _stream_durations(path: Path) -> list[float]:
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "stream=duration", "-of", "csv=p=0", str(path)],
+        check=True, capture_output=True, text=True,
+    )
+    return [float(x) for x in out.stdout.split() if x not in ("", "N/A")]
+
+
+def _remux(src: Path, dest: Path) -> Path:
+    """Same streams, one shared video timescale, so the copy join keeps every timestamp."""
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-i", str(src), "-c", "copy", "-video_track_timescale", str(JOIN_TIMESCALE),
+         str(dest)],
+        check=True, capture_output=True,
+    )
+    return dest
+
+
 def concat(parts: list[Path], out: Path) -> Path:
+    """Join parts without re-encoding. Footballia halves are often encoded differently (timescale,
+    frame rate, size); each is remuxed to one timescale first, and the join must last as long as
+    its parts together, or it raises BadJoin."""
+    expected = sum(max(_stream_durations(p), default=0.0) for p in parts)
     listing = out.with_suffix(".txt")
-    listing.write_text("".join(f"file '{p.resolve()}'\n" for p in parts))
+    remuxed = [out.with_name(f"{out.stem}.join{i}.mp4") for i in range(len(parts))]
     try:
+        joined = [_remux(p, r) for p, r in zip(parts, remuxed)]
+        listing.write_text("".join(f"file '{p.resolve()}'\n" for p in joined))
         subprocess.run(
             ["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
              "-c", "copy", "-movflags", "+faststart", str(out)],
@@ -154,6 +186,12 @@ def concat(parts: list[Path], out: Path) -> Path:
         )
     finally:
         listing.unlink(missing_ok=True)
+        for r in remuxed:
+            r.unlink(missing_ok=True)
+    got = _stream_durations(out)
+    if not got or any(abs(d - expected) > JOIN_TOLERANCE_S for d in got):
+        out.unlink(missing_ok=True)
+        raise BadJoin(f"joined streams last {[round(d) for d in got]} s; parts add up to {expected:.0f} s")
     return out
 
 

@@ -110,3 +110,12 @@ def test_rate_limit_retries_more_than_server_errors(segment):
     respx.post(DECISIONS_URL).mock(side_effect=[limited] * 8 + [_resp({"flop": {"type": "noul", "noul": 0.5, "confidence": 0.5}})])
     assert DecisionScorer(KEY, sleep=sleeps.append).score(segment).p_flop == 0.5
     assert len(sleeps) == 8
+
+
+@respx.mock
+def test_prohibited_content_is_a_content_block(segment):
+    # Pilot: one Arsenal-Luton window was refused as "prohibited_content", every time.
+    from flopstats.detect.gemini import ContentBlocked
+    respx.post(DECISIONS_URL).respond(400, json={"error": {"code": "prohibited_content", "message": "Input blocked"}})
+    with pytest.raises(ContentBlocked):
+        DecisionScorer(KEY).score(segment)

@@ -241,3 +241,19 @@ def test_concurrent_run_of_the_same_match_is_refused(db, world, tmp_path):
         rep = runner.process_match(db, run, URL, deps)
         assert rep.status == "busy" and deps.scorer.calls == [] and deps.downloads == []
     assert runner.process_match(db, run, URL, deps).status == "done"  # lock released with the other session
+
+
+class BlockingScorer(FakeScorer):
+    def score(self, segment):
+        from flopstats.detect.gemini import ContentBlocked
+        if int(Path(segment).stem.split("_")[-1]) == 3000:
+            raise ContentBlocked("HTTP 400 (prohibited_content: Input blocked)")
+        return super().score(segment)
+
+
+def test_a_blocked_window_is_stored_unscored_and_the_match_continues(db, world, tmp_path):
+    run = runner.create_run(db, "pilot-v1", CONFIG)
+    rep = runner.process_match(db, run, URL, make_deps(tmp_path, scorer=BlockingScorer()))
+    assert rep.status == "done"
+    assert counts(db)["windows"] == 599
+    assert db.execute("select score from windows where start_s = 3000").fetchone() == (None,)

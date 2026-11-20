@@ -25,6 +25,7 @@ from flopstats import costs, jobs, review
 from flopstats.config import Settings
 from flopstats.detect import candidates as cand_mod
 from flopstats.detect import dedupe, enrich, verify
+from flopstats.detect.gemini import ContentBlocked
 from flopstats.detect.priors import MatchEvent, window_priors
 from flopstats.detect.sim import SimWeights
 from flopstats.detect.verify import LineupPlayer, VerifyContext, VerifyResult
@@ -309,8 +310,17 @@ class _Ctx:
             self.guard(self._window_usd() * len(batch))
             for start, end in batch:
                 seg = self.deps.cut(self.local_video(), start, end, self.dir / "windows" / f"win_{int(start)}.mp4", reencode=True)
-                r = self.deps.scorer.score(seg)
                 prior = priors[(start, end)]
+                try:
+                    r = self.deps.scorer.score(seg)
+                except ContentBlocked:  # refused every time; the overlapping windows cover this footage
+                    with self.conn.transaction():
+                        self.conn.execute(
+                            "insert into windows (run_id, video_id, start_s, end_s, score, prior, final_score) values (%s, %s, %s, %s, null, %s, %s) "
+                            "on conflict (run_id, video_id, start_s) do nothing",
+                            (self.run_id, self.video_id, start, end, prior, cand_mod.final_score(0.0, prior, self.cfg.prior_weight)))
+                    Path(seg).unlink(missing_ok=True)
+                    continue
                 with self.conn.transaction():
                     self.conn.execute(
                         "insert into windows (run_id, video_id, start_s, end_s, score, prior, final_score) values (%s, %s, %s, %s, %s, %s, %s) "
@@ -328,7 +338,7 @@ class _Ctx:
                                      (self.run_id, self.video_id)).fetchone()[0]
         if not existing:
             rows = [cand_mod.WindowRow(s, e, sc, pr) for s, e, sc, pr in self.conn.execute(
-                "select start_s, end_s, score, prior from windows where run_id = %s and video_id = %s", (self.run_id, self.video_id))]
+                "select start_s, end_s, coalesce(score, 0), prior from windows where run_id = %s and video_id = %s", (self.run_id, self.video_id))]
             with self.conn.transaction():
                 for c in cand_mod.select(rows, self.cfg.candidate_threshold, self.cfg.prior_weight):
                     self.conn.execute(

@@ -13,21 +13,30 @@ from typing import Literal
 
 import psycopg
 from psycopg.types.json import Jsonb
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from flopstats import costs
 
 FlopType = Literal["dive", "exaggeration", "feigned_injury", "time_wasting"]
 
 
-class PlayerGuess(BaseModel):
+class _ModelText(BaseModel):
+    """Model output is untrusted text: drop NUL characters, which Postgres text/jsonb can't store."""
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _drop_nul(cls, v):
+        return v.replace("\x00", "") if isinstance(v, str) else v
+
+
+class PlayerGuess(_ModelText):
     team: Literal["home", "away"] | None = None
     shirt_number: int | None = None
     name: str | None = None
     confidence: float = Field(default=0.0, ge=0, le=1)
 
 
-class FlopAttrs(BaseModel):
+class FlopAttrs(_ModelText):
     time_on_ground_s: float | None = Field(default=None, ge=0)
     rolls: int | None = Field(default=None, ge=0)
     fake_pain: int | None = Field(default=None, ge=1, le=10)
@@ -41,7 +50,7 @@ class FlopAttrs(BaseModel):
     pitch_conf: float | None = Field(default=None, ge=0, le=1)
 
 
-class ModelAnswer(BaseModel):
+class ModelAnswer(_ModelText):
     """What a verifier model must return (the JSON schema it is given)."""
 
     is_flop: bool
@@ -87,7 +96,7 @@ def run(
     match_id: int | None = None,
 ) -> list[VerifyResult]:
     """Run every verifier once per candidate; return the valid results in verifier order."""
-    from flopstats.detect.gemini import InvalidModelOutput
+    from flopstats.detect.gemini import ContentBlocked, InvalidModelOutput
 
     out: list[VerifyResult] = []
     for v in verifiers:
@@ -103,6 +112,8 @@ def run(
             answers, confidence, usd = res.model_dump(mode="json"), res.confidence, res.usd
         except InvalidModelOutput as exc:
             res, answers, confidence, usd = None, {"invalid": True, "error": str(exc)}, None, exc.usd
+        except ContentBlocked as exc:  # same input is refused every time: store it, don't retry
+            res, answers, confidence, usd = None, {"invalid": True, "blocked": True, "error": str(exc)}, None, Decimal(0)
         with conn.transaction():
             conn.execute(
                 "insert into verifications (candidate_id, model, answers, confidence, usd) values (%s, %s, %s, %s, %s) "

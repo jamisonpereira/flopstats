@@ -90,3 +90,37 @@ def test_download_part_resumes_from_partial_file(tmp_path):
     download.download_file(httpx.Client(), PART1, dest)
     assert route.calls[0].request.headers["range"] == "bytes=4-"
     assert dest.read_bytes() == b"0123456789"
+
+
+def _part(path: Path, seconds: int, rate: int, timescale: int, size: str) -> Path:
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", f"testsrc=size={size}:rate={rate}:duration={seconds}",
+         "-f", "lavfi", "-i", f"sine=duration={seconds}", "-c:v", "libx264", "-c:a", "aac", "-shortest",
+         "-video_track_timescale", str(timescale), str(path)],
+        check=True,
+    )
+    return path
+
+
+def _stream_durations(path: Path) -> list[float]:
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=duration", "-of", "csv=p=0", str(path)],
+                         check=True, capture_output=True, text=True).stdout
+    return [float(x) for x in out.split()]
+
+
+def test_concat_keeps_the_timeline_when_halves_are_encoded_differently(tmp_path):
+    # Pilot: footballia halves with different timescales / frame rates (e.g. 1/30000 vs 1/90000,
+    # 25 vs 30 fps) joined with plain `concat -c copy` gave a 20,000 s video for a 111-minute match.
+    a = _part(tmp_path / "a.mp4", 6, rate=30, timescale=30000, size="64x36")
+    b = _part(tmp_path / "b.mp4", 6, rate=25, timescale=90000, size="128x72")
+    out = download.concat([a, b], tmp_path / "joined.mp4")
+    for d in _stream_durations(out):
+        assert d == pytest.approx(12, abs=0.5)
+
+
+def test_concat_refuses_a_join_whose_length_doesnt_add_up(tmp_path, monkeypatch):
+    a = _part(tmp_path / "a.mp4", 6, rate=30, timescale=30000, size="64x36")
+    b = _part(tmp_path / "b.mp4", 6, rate=30, timescale=90000, size="64x36")
+    monkeypatch.setattr(download, "_remux", lambda src, dest: src)  # plain copy join: timeline breaks
+    with pytest.raises(download.BadJoin):
+        download.concat([a, b], tmp_path / "joined.mp4")

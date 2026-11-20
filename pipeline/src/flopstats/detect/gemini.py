@@ -50,6 +50,10 @@ class DecisionError(RuntimeError):
     pass
 
 
+class ContentBlocked(DecisionError):
+    """The API refused this input under its content policy. Retrying the same input doesn't help."""
+
+
 RATE_LIMIT_RETRIES = 10
 
 
@@ -101,7 +105,10 @@ def post_json(http: httpx.Client, url: str, body: dict, key: str, sleep: Callabl
             sleep(2.0 ** (server_errors - 1))
             continue
         if resp.status_code != 200:
-            raise DecisionError(f"HTTP {resp.status_code} ({_error_detail(resp)})")
+            detail = _error_detail(resp)
+            if resp.status_code == 400 and "prohibited_content" in detail.lower():
+                raise ContentBlocked(f"HTTP 400 ({detail})")
+            raise DecisionError(f"HTTP {resp.status_code} ({detail})")
         return resp.json()
 
 
