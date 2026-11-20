@@ -1,6 +1,15 @@
-/** Only same-site relative paths may be redirect targets. */
+const BASE = "http://flopstats.invalid";
+
+/** Only same-site relative paths may be redirect targets ("/\evil.com" and friends are not). */
 export function safeNext(next: string | null | undefined): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/review";
+  if (!next || !next.startsWith("/") || /[\\\u0000-\u001f\u007f]/.test(next)) return "/review";
+  try {
+    const url = new URL(next, BASE);
+    if (url.origin !== BASE) return "/review";
+    return url.pathname + url.search;
+  } catch {
+    return "/review";
+  }
 }
 
 /** Absolute URL on the host the browser actually used (dev servers report "localhost"

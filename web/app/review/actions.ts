@@ -4,12 +4,15 @@ import { redirect } from "next/navigation";
 import { TYPES, type Supa } from "@/lib/review";
 import { userClient } from "@/lib/supabase";
 
-type Ctx = { sb: Supa; itemId: number | null; incidentId: number | null; reason: string | null };
+type Ctx = { sb: Supa; itemId: number | null; itemKind: string | null; incidentId: number | null; reason: string | null };
 
 async function ctx(form: FormData): Promise<Ctx> {
   const num = (k: string) => (form.get(k) ? Number(form.get(k)) : null);
   const reason = String(form.get("reason") ?? "").trim();
-  return { sb: await userClient(), itemId: num("item_id"), incidentId: num("incident_id"), reason: reason || null };
+  const sb = await userClient();
+  const itemId = num("item_id");
+  const kind = itemId ? (await sb.from("review_items").select("kind").eq("id", itemId).maybeSingle()).data?.kind ?? null : null;
+  return { sb, itemId, itemKind: kind, incidentId: num("incident_id"), reason: reason || null };
 }
 
 function check<T>(res: { error: { message: string } | null; data?: T }, what: string): T | undefined {
@@ -17,12 +20,21 @@ function check<T>(res: { error: { message: string } | null; data?: T }, what: st
   return res.data;
 }
 
-async function record(c: Ctx, decision: string, value: Record<string, unknown>, resolution: Record<string, unknown>) {
+/** Store the decision; resolve the item only if this decision is what the item asks for. */
+async function record(c: Ctx, decision: string, value: Record<string, unknown>, resolution: Record<string, unknown>,
+                      answers: string[] | null = null): Promise<boolean> {
   check(await c.sb.from("reviews").insert({ incident_id: c.incidentId, item_id: c.itemId, decision, value, reason: c.reason }), "review");
+  if (c.itemId && answers && !answers.includes(c.itemKind ?? "")) return false;
   if (c.itemId) {
     check(await c.sb.from("review_items").update({ status: "resolved", resolution, resolved_at: new Date().toISOString() })
       .eq("id", c.itemId).eq("status", "open"), "resolve item");
   }
+  return true;
+}
+
+/** After a decision that doesn't answer this item: stay on it and say what's still owed. */
+function stay(c: Ctx): never {
+  redirect(`/review/${c.itemId}?saved=1`);
 }
 
 /** The next open item after this one, else the queue. */
@@ -34,14 +46,14 @@ async function goNext(c: Ctx): Promise<never> {
 export async function confirmFlop(form: FormData) {
   const c = await ctx(form);
   check(await c.sb.from("incidents").update({ status: "confirmed" }).eq("id", c.incidentId!), "incident");
-  await record(c, "confirm", {}, { status: "confirmed" });
+  if (!(await record(c, "confirm", {}, { status: "confirmed" }, ["flop_verdict"]))) stay(c);
   await goNext(c);
 }
 
 export async function rejectFlop(form: FormData) {
   const c = await ctx(form);
   check(await c.sb.from("incidents").update({ status: "rejected" }).eq("id", c.incidentId!), "incident");
-  await record(c, "reject", {}, { status: "rejected" });
+  if (!(await record(c, "reject", {}, { status: "rejected" }, ["flop_verdict"]))) stay(c);
   await goNext(c);
 }
 
@@ -49,16 +61,29 @@ export async function changeType(type: string, form: FormData) {
   const c = await ctx(form);
   if (!(TYPES as readonly string[]).includes(type)) throw new Error("unknown flop type");
   check(await c.sb.from("incidents").update({ type, status: "confirmed" }).eq("id", c.incidentId!), "incident");
-  await record(c, "change_type", { type }, { status: "confirmed", type });
+  if (!(await record(c, "change_type", { type }, { status: "confirmed", type }, ["flop_verdict"]))) stay(c);
   await goNext(c);
 }
 
 export async function setPlayer(playerId: number, form: FormData) {
   const c = await ctx(form);
   if (!Number.isInteger(playerId) || playerId <= 0) throw new Error("no player chosen");
-  check(await c.sb.from("incident_players").update({ player_id: playerId, confidence: 1 })
-    .eq("incident_id", c.incidentId!).eq("role", "flopper"), "incident player");
-  await record(c, "set_player", { player_id: playerId }, { player_id: playerId });
+  const inc = check(await c.sb.from("incidents").select("match_id, team_id").eq("id", c.incidentId!).single(), "incident") as
+    { match_id: number; team_id: number | null };
+  const row = check(await c.sb.from("match_lineups").select("team_id").eq("match_id", inc.match_id).eq("player_id", playerId).maybeSingle(), "lineup") as
+    { team_id: number } | null;
+  if (!row) throw new Error("that player is not in this match's lineups");
+  const existing = check(await c.sb.from("incident_players").select("id").eq("incident_id", c.incidentId!).eq("role", "flopper"), "flopper") as { id: number }[];
+  if (existing.length) {
+    check(await c.sb.from("incident_players").update({ player_id: playerId, team_id: row.team_id, confidence: 1 })
+      .eq("incident_id", c.incidentId!).eq("role", "flopper"), "incident player");
+  } else {
+    // The AI couldn't even tell the team: create the flopper row from the chosen player's lineup entry.
+    check(await c.sb.from("incident_players").insert({ incident_id: c.incidentId, player_id: playerId, team_id: row.team_id,
+      role: "flopper", confidence: 1 }), "incident player");
+  }
+  if (inc.team_id == null) check(await c.sb.from("incidents").update({ team_id: row.team_id }).eq("id", c.incidentId!), "incident team");
+  if (!(await record(c, "set_player", { player_id: playerId }, { player_id: playerId }, ["flop_player"]))) stay(c);
   await goNext(c);
 }
 

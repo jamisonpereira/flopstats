@@ -80,6 +80,14 @@ def link_event_player(
             if best[0] > runner_up:  # a tie is not a confident pick
                 return LinkResult(best[1], best[0] / 100.0, "fuzzy")
 
+    subject = ("match_event", event_id) if event_id is not None else ("match", match_id)
+    done = conn.execute(
+        "select resolution from review_items where kind = 'player_link' and subject_type = %s and subject_id = %s "
+        "and status = 'resolved' order by resolved_at desc limit 1", subject).fetchone()
+    if done is not None:  # Jamison already decided; never reopen it
+        chosen = (done[0] or {}).get("player_id")
+        return LinkResult(chosen, 1.0, "review") if chosen else LinkResult(None, 0.0, "none")
+
     review.create(
         conn,
         "player_link",

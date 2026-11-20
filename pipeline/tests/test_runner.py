@@ -212,3 +212,32 @@ def test_run_status_summary(db, world, tmp_path):
     s = runner.status(db, run)
     assert s["jobs"]["done"] == 9 and s["incidents"] == {"confirmed": 4} and s["open_reviews"] == 1
     assert s["spent_usd"] > 0
+
+
+# --- final review I5/I10 ---------------------------------------------------------------
+
+def test_unknown_listing_link_item_is_resolvable(db, world, tmp_path):
+    run = runner.create_run(db, "pilot-v1", CONFIG)
+    deps = make_deps(tmp_path)
+    deps.entry_for = lambda conn, url: None  # never seen by `watch` / `season`
+    assert runner.process_match(db, run, URL, deps).status == "paused_link"
+    item, subject_type, subject_id = db.execute("select id, subject_type, subject_id from review_items").fetchone()
+    assert subject_type == "footballia_listing"
+    assert _one(db, "select entity_type from external_refs where id = %s", subject_id) == "footballia_listing"
+    review.resolve(db, item, {"match_id": world["match"]})
+    assert runner.process_match(db, run, URL, deps).status == "done"
+
+
+def test_concurrent_run_of_the_same_match_is_refused(db, world, tmp_path):
+    import psycopg
+
+    from conftest import LOCAL_DB_URL
+
+    run = runner.create_run(db, "pilot-v1", CONFIG)
+    deps = make_deps(tmp_path)
+    video = _one(db, "insert into videos (source, source_url) values ('footballia', %s) returning id", URL)
+    with psycopg.connect(LOCAL_DB_URL, autocommit=True) as other:
+        assert other.execute("select pg_try_advisory_lock(%s)", (runner.match_lock_key(run, video),)).fetchone()[0]
+        rep = runner.process_match(db, run, URL, deps)
+        assert rep.status == "busy" and deps.scorer.calls == [] and deps.downloads == []
+    assert runner.process_match(db, run, URL, deps).status == "done"  # lock released with the other session

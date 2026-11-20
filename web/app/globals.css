@@ -18,3 +18,4 @@ h1 { font-size: 1.4rem; margin: 0.5rem 0; } h2 { font-size: 1.05rem; margin-top:
 button { font: inherit; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; }
 button.ok { border-color: var(--ok); color: var(--ok); } button.no { border-color: var(--no); color: var(--no); }
 input, textarea { font: inherit; padding: 8px; width: 100%; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); }
+.notice { padding: 8px 12px; border: 1px solid var(--accent); border-radius: 6px; }

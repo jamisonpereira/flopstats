@@ -122,6 +122,24 @@ def process_match(conn: psycopg.Connection, run_id: int, footballia_url: str, de
     with conn.transaction():
         conn.execute("insert into videos (source, source_url) values ('footballia', %s) on conflict do nothing", (footballia_url,))
     video_id = conn.execute("select id from videos where source = 'footballia' and source_url = %s", (footballia_url,)).fetchone()[0]
+    # One process per match: a second runner would pay for the same model calls again.
+    lock = match_lock_key(run_id, video_id)
+    if not conn.execute("select pg_try_advisory_lock(%s)", (lock,)).fetchone()[0]:
+        return MatchReport("busy", video_id, {})
+    try:
+        return _process(conn, run_id, video_id, footballia_url, cfg, deps)
+    finally:
+        conn.execute("select pg_advisory_unlock(%s)", (lock,))
+
+
+def match_lock_key(run_id: int, video_id: int) -> int:
+    """A stable 63-bit advisory-lock key for (run, video)."""
+    import hashlib
+
+    return int.from_bytes(hashlib.sha256(f"flopstats:match:{run_id}:{video_id}".encode()).digest()[:8], "big") >> 1
+
+
+def _process(conn, run_id: int, video_id: int, footballia_url: str, cfg: RunConfig, deps: Deps) -> MatchReport:
     ctx = _Ctx(conn, run_id, video_id, footballia_url, cfg, deps)
     for step in STEPS:
         job_id = jobs.enqueue(conn, step, f"{run_id}:{video_id}:{step}", {"url": footballia_url})
@@ -213,7 +231,17 @@ class _Ctx:
         if match_id is None:
             entry = self.deps.entry_for(self.conn, self.url)
             if entry is None:
-                review.create(self.conn, "match_link", "video", self.video_id, {"url": self.url, "reason": "no listing metadata"})
+                # Unknown listing: record it so the review item has a footballia_listing subject the
+                # review screen and this step both understand.
+                with self.conn.transaction():
+                    ref = self.conn.execute(
+                        "insert into external_refs (entity_type, source, source_id, status, payload) "
+                        "values ('footballia_listing', 'footballia', %s, 'needs_review', %s) "
+                        "on conflict (entity_type, source, source_id) do update set source_id = excluded.source_id returning id",
+                        (self.url, Jsonb({"url": self.url})),
+                    ).fetchone()[0]
+                review.create(self.conn, "match_link", "footballia_listing", ref,
+                              {"url": self.url, "reason": "no listing metadata", "guesses": []})
                 raise _Stop("paused_link", "needs_review")
             match_id = link_match(self.conn, entry).match_id
             if match_id is None:

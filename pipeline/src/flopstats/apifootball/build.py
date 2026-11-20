@@ -359,8 +359,10 @@ def _build_fixture(conn, f: dict, season_id: int, country_id: int, report: Build
         # Assists (and the incoming player on a substitution) link by API id only.
         assist_id = _ref_id(conn, "player", assist_api)
         conn.execute(
-            "update match_events set player_id = %s, assist_player_id = %s where id = %s "
-            "and (player_id, assist_player_id) is distinct from (%s::bigint, %s::bigint)",
+            # coalesce: a rebuild never erases a player set earlier (e.g. by a review decision).
+            "update match_events set player_id = coalesce(%s, player_id), assist_player_id = coalesce(%s, assist_player_id) "
+            "where id = %s and (player_id, assist_player_id) is distinct from "
+            "(coalesce(%s::bigint, player_id), coalesce(%s::bigint, assist_player_id))",
             (link.player_id, assist_id, event_id, link.player_id, assist_id),
         )
         report.see("match_events", event_id)

@@ -9,8 +9,10 @@ import Shortcuts from "../Shortcuts";
 
 export const dynamic = "force-dynamic";
 
-export default async function ItemPage({ params }: { params: Promise<{ itemId: string }> }) {
+export default async function ItemPage({ params, searchParams }: {
+  params: Promise<{ itemId: string }>; searchParams: Promise<Record<string, string | undefined>> }) {
   const { itemId } = await params;
+  const { saved } = await searchParams;
   const sb = await userClient();
   let item: Item | null = null;
   let incidentId: number | null = null;
@@ -32,6 +34,9 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
         {nav.next && <Link href={`/review/${nav.next}`} data-key="j">next (j)</Link>}
       </p>
       {item && <h1>{item.kind} #{item.id}{item.status !== "open" && ` (${item.status})`}</h1>}
+      {saved && item?.status === "open" && (
+        <p className="notice">Saved. This item still needs {item.kind === "flop_player" ? "a player" : "a verdict"}.</p>
+      )}
       {incidentId != null && (await IncidentView({ sb, incidentId, item }))}
       {item?.kind === "match_link" && <MatchLinkView item={item} />}
       {item?.kind === "video_sync" && <VideoSyncView item={item} />}
@@ -68,9 +73,10 @@ async function IncidentView({ sb, incidentId, item }: { sb: Supa; incidentId: nu
   ]);
   const flopper = (players ?? []).find((p) => p.role === "flopper");
   const teamId = flopper?.team_id ?? inc.team_id;
-  const { data: lineup } = teamId
-    ? await sb.from("match_lineups").select("player_id, shirt_number, players(display_name)").eq("match_id", inc.match_id).eq("team_id", teamId).order("shirt_number")
-    : { data: [] };
+  // Unknown team: offer both lineups.
+  let lineupQuery = sb.from("match_lineups").select("player_id, shirt_number, team_id, players(display_name), teams(name)").eq("match_id", inc.match_id);
+  if (teamId) lineupQuery = lineupQuery.eq("team_id", teamId);
+  const { data: lineup } = await lineupQuery.order("team_id").order("shirt_number");
   const url = await signedClipUrl(clip?.path);
   const attrs = (inc.attrs ?? {}) as Record<string, unknown>;
   const name = (p: WithPlayer | null | undefined) => (Array.isArray(p?.players) ? p.players[0]?.display_name : p?.players?.display_name);
@@ -106,8 +112,10 @@ async function IncidentView({ sb, incidentId, item }: { sb: Supa; incidentId: nu
         <details>
           <summary>Whole lineup</summary>
           <div className="row">
-            {((lineup ?? []) as ({ player_id: number; shirt_number: number | null } & WithPlayer)[]).map((p) => (
-              <button key={`l${p.player_id}`} formAction={setPlayer.bind(null, Number(p.player_id))}>#{p.shirt_number ?? "?"} {name(p)}</button>
+            {((lineup ?? []) as ({ player_id: number; shirt_number: number | null; teams?: { name: string } | { name: string }[] | null } & WithPlayer)[]).map((p) => (
+              <button key={`l${p.player_id}`} formAction={setPlayer.bind(null, Number(p.player_id))}>
+                #{p.shirt_number ?? "?"} {name(p)}{!teamId && ` (${Array.isArray(p.teams) ? p.teams[0]?.name : p.teams?.name})`}
+              </button>
             ))}
           </div>
         </details>

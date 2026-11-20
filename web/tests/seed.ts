@@ -9,7 +9,8 @@ export const OUTSIDER = "fan@example.com";
 const env = localSupabaseEnv();
 
 export type Seed = { verdictItem: number; playerItem: number; reviewIncident: number; playerIncident: number;
-  confirmedIncidents: number[]; rejectedIncident: number; homeSeven: number };
+  confirmedIncidents: number[]; rejectedIncident: number; homeSeven: number; awayEleven: number; away: number;
+  noTeamIncident: number; noTeamItem: number };
 
 export function admin() {
   return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
@@ -49,20 +50,24 @@ export async function seed(): Promise<Seed> {
     const playerIncident = await incident("confirmed", 30, "b");
     const confirmedIncidents = [playerIncident, await incident("confirmed", 50, "c"), await incident("confirmed", 70, "d")];
     const rejectedIncident = await incident("rejected", 80, "e");
+    const noTeamIncident = await incident("review", 85, "f");
+    await db.query("update incidents set team_id = null, status = 'confirmed' where id = $1", [noTeamIncident]);
     await db.query("insert into incident_players (incident_id, team_id, role, confidence, player_id) values ($1, $2, 'flopper', 0.9, $3)", [reviewIncident, home, players["Home Nine"]]);
     const guesses = [{ player_id: players["Home Seven"], name: "Home Seven", shirt_number: 7, team_id: home },
                      { player_id: players["Home Nine"], name: "Home Nine", shirt_number: 9, team_id: home }];
     await db.query("insert into incident_players (incident_id, team_id, role, confidence, guesses) values ($1, $2, 'flopper', 0.3, $3)", [playerIncident, home, JSON.stringify(guesses)]);
     const verdictItem = await one("insert into review_items (kind, subject_type, subject_id, payload) values ('flop_verdict', 'incident', $1, '{}') returning id", [reviewIncident]);
     const playerItem = await one("insert into review_items (kind, subject_type, subject_id, payload) values ('flop_player', 'incident', $1, $2) returning id", [playerIncident, JSON.stringify({ team_id: home, guesses })]);
+    const noTeamItem = await one("insert into review_items (kind, subject_type, subject_id, payload) values ('flop_player', 'incident', $1, '{\"guesses\": []}') returning id", [noTeamIncident]);
 
     const sb = admin();
     await sb.storage.createBucket("media", { public: false }).catch(() => undefined);
     const clip = fs.readFileSync(path.resolve(__dirname, "../../pipeline/tests/fixtures/video/tiny.mp4"));
-    for (const id of [...confirmedIncidents, reviewIncident, rejectedIncident]) {
+    for (const id of [...confirmedIncidents, reviewIncident, rejectedIncident, noTeamIncident]) {
       await sb.storage.from("media").upload(`clips/${m}/${id}.mp4`, clip, { contentType: "video/mp4", upsert: true });
     }
-    return { verdictItem, playerItem, reviewIncident, playerIncident, confirmedIncidents, rejectedIncident, homeSeven: players["Home Seven"] };
+    return { verdictItem, playerItem, reviewIncident, playerIncident, confirmedIncidents, rejectedIncident, homeSeven: players["Home Seven"],
+      awayEleven: players["Away Eleven"], away, noTeamIncident, noTeamItem };
   } finally {
     await db.end();
   }

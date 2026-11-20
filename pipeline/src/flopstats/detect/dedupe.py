@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 
 from flopstats.detect.verify import VerifyResult
@@ -28,16 +29,23 @@ class Placed:
 def key(result: VerifyResult, video_start_s: float) -> str:
     start = math.floor((video_start_s + result.start_s) / KEY_ROUND_S + 0.5) * KEY_ROUND_S
     f = result.flopper
-    return f"{start}:{f.team or '?'}:{f.shirt_number if f.shirt_number is not None else '?'}"
+    shirt = str(f.shirt_number) if f.shirt_number is not None else "?"
+    if f.shirt_number is None and f.name:  # keep two named-but-unnumbered floppers apart
+        shirt += ":" + re.sub(r"[^a-z0-9]+", "-", f.name.casefold()).strip("-")
+    return f"{start}:{f.team or '?'}:{shirt}"
 
 
 def _same_flopper(a: VerifyResult, b: VerifyResult) -> bool:
+    """Could these be the same player? Unknown fields are compatible; only known, different
+    values (team, shirt number, or name when neither has a number) tell two players apart."""
     fa, fb = a.flopper, b.flopper
-    if fa.team != fb.team or fa.team is None:
+    if fa.team and fb.team and fa.team != fb.team:
         return False
     if fa.shirt_number is not None and fb.shirt_number is not None:
         return fa.shirt_number == fb.shirt_number
-    return bool(fa.name and fb.name and fa.name.casefold() == fb.name.casefold())
+    if fa.name and fb.name and fa.shirt_number is None and fb.shirt_number is None:
+        return fa.name.casefold() == fb.name.casefold()
+    return True
 
 
 def collapse(items: list[Placed]) -> list[Placed]:

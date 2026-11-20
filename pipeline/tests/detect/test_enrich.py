@@ -132,3 +132,32 @@ def test_review_cap_counts_this_match_in_this_run(world, db):
 def test_persist_records_ai_status(world, db):
     iid = enrich.persist(db, world["run"], world["cand"], R(conf=0.6), SYNC, world["match"], CFG)
     assert _one(db, "select ai_status from incidents where id = %s", iid) == "review"
+
+
+# --- final review I3/I4 ----------------------------------------------------------------
+
+def test_attribute_name_tie_is_not_a_pick(world, db):
+    lineup = world["lineup"] + [LineupEntry(player_id=999, team_id=world["home"], shirt_number=11, name="Mason Greenwood")]
+    a = enrich.attribute(PlayerGuess(team="home", shirt_number=None, name="Mason", confidence=0.9), lineup, world["home"], 0.6)
+    assert a.player_id is None and len(a.guesses) == 3
+
+
+def test_review_items_are_written_with_the_incident(world, db, monkeypatch):
+    from flopstats import review
+
+    real = review.create
+    calls = {"n": 0}
+
+    def flaky(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("killed")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(review, "create", flaky)
+    with pytest.raises(RuntimeError):
+        enrich.persist(db, world["run"], world["cand"], R(conf=0.6, shirt=44), SYNC, world["match"], CFG)
+    assert _one(db, "select count(*) from incidents") == 0  # all or nothing
+    enrich.persist(db, world["run"], world["cand"], R(conf=0.6, shirt=44), SYNC, world["match"], CFG)
+    kinds = sorted(r[0] for r in db.execute("select kind from review_items").fetchall())
+    assert kinds == ["flop_player", "flop_verdict"]

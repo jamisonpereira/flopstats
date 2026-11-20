@@ -90,8 +90,11 @@ def attribute(guess: PlayerGuess, lineup: list[LineupEntry], team_id: int | None
         if len(by_shirt) == 1:
             match, conf = by_shirt[0], guess.confidence
     if match is None and target:
-        best = max(team, key=name_score, default=None)
-        if best is not None and name_score(best) >= NAME_MIN:
+        scored = sorted(team, key=name_score, reverse=True)
+        best = scored[0] if scored else None
+        runner_up = name_score(scored[1]) if len(scored) > 1 else -1
+        # A tie ("Silva" for two Silvas) is not a pick: it goes to the guesses / review path.
+        if best is not None and name_score(best) >= NAME_MIN and name_score(best) > runner_up:
             match, conf = best, guess.confidence * name_score(best) / 100
     if match is None or conf < min_conf:
         return Attribution(None, conf, guesses)
@@ -178,9 +181,10 @@ def persist(conn: psycopg.Connection, run_id: int, candidate: CandidateRef, resu
                 (incident_id, a.player_id, other_team, role, a.confidence, Jsonb(a.guesses)),
             )
 
-    if st == "review":
-        review.create(conn, "flop_verdict", "incident", incident_id, {"confidence": result.confidence, "type": result.type})
-    if st != "rejected" and flopper.player_id is None:
-        review.create(conn, "flop_player", "incident", incident_id, {
-            "team_id": team_id, "guess": result.flopper.model_dump(), "guesses": flopper.guesses})
+        # Same transaction as the incident: a crash can't leave an incident without its review items.
+        if st == "review":
+            review.create(conn, "flop_verdict", "incident", incident_id, {"confidence": result.confidence, "type": result.type})
+        if st != "rejected" and flopper.player_id is None:
+            review.create(conn, "flop_player", "incident", incident_id, {
+                "team_id": team_id, "guess": result.flopper.model_dump(), "guesses": flopper.guesses})
     return incident_id

@@ -25,6 +25,7 @@ AGREE_S = 3.0
 MIN_AGREEING = 5
 MIN_CONFIDENCE = 0.2  # the ±3 s agreement of ≥5 readings is the real guard
 EDGE_S = 120.0
+RIVAL_CLUSTER = 3
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,8 @@ def sync(
 ) -> SyncResult:
     first: list[float] = []
     second: list[float] = []
+    first_strict: list[float] = []  # clock < 45:00: certainly first half
+    second_strict: list[float] = []  # clock > 55:00: certainly second half
     with tempfile.TemporaryDirectory(prefix="flopstats-sync-") as tmp:
         for i, t in enumerate(sample_times(duration_s, samples)):
             png = extract(Path(video_path), t, Path(tmp) / f"sample_{i:03d}.png")
@@ -84,14 +87,25 @@ def sync(
             clock = reading.minute * 60 + reading.second
             if clock <= HALF_S + MAX_FIRST_HALF_STOPPAGE_S:
                 first.append(t - clock)
+                if clock < HALF_S:
+                    first_strict.append(t - clock)
             if clock >= HALF_S:
                 second.append(t - (clock - HALF_S))
+                if clock > HALF_S + MAX_FIRST_HALF_STOPPAGE_S:
+                    second_strict.append(t - (clock - HALF_S))
 
-    def fit(cands: list[float]) -> float | None:
+    def fit(cands: list[float], strict: list[float]) -> float | None:
         group = _cluster(cands)
-        return statistics.median(group) if len(group) >= MIN_AGREEING else None
+        if len(group) < MIN_AGREEING:
+            return None
+        center = statistics.median(group)
+        # A second consistent cluster in the same half means two mappings fit: never pick one.
+        rest = [x for x in strict if abs(x - center) > AGREE_S]
+        if len(_cluster(rest)) >= RIVAL_CLUSTER:
+            return None
+        return center
 
-    kickoff, second_half = fit(first), fit(second)
+    kickoff, second_half = fit(first, first_strict), fit(second, second_strict)
     if kickoff is not None and second_half is not None and second_half < kickoff + HALF_S:
         kickoff = second_half = None  # inconsistent: the second half can't start before 45 min of play
     status = "ok" if kickoff is not None and second_half is not None else "needs_review"

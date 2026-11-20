@@ -174,3 +174,16 @@ def test_report_counts_distinct_rows(raw):
     for table in ("teams", "players", "venues", "referees", "coaches", "matches", "match_lineups",
                   "match_events", "team_seasons", "player_team_seasons"):
         assert report.counts[table] == counts[table], table
+
+
+def test_rebuild_keeps_a_reviewed_event_player(raw):
+    from flopstats import review
+
+    build_season(raw, 39, 2024)
+    item, event_id = raw.execute("select id, subject_id from review_items where kind = 'player_link'").fetchone()
+    salah = _one(raw, "select id from players where display_name = 'Mohamed Salah'")[0]
+    raw.execute("update match_events set player_id = %s where id = %s", (salah, event_id))  # what the review screen does
+    review.resolve(raw, item, {"player_id": salah})
+    build_season(raw, 39, 2024)
+    assert _one(raw, "select player_id from match_events where id = %s", event_id)[0] == salah
+    assert _one(raw, "select count(*) from review_items where kind = 'player_link'")[0] == 1

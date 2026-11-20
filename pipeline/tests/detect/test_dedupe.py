@@ -50,3 +50,27 @@ def test_two_distinct_flops_same_minute_kept():
     a = Placed(R(5.0, team="home", shirt=7), video_start_s=1000, candidate_id=1)
     b = Placed(R(20.0, team="away", shirt=9), video_start_s=1000, candidate_id=1)
     assert collapse([a, b]) == [a, b]
+
+
+# --- final review I2: partial identities ------------------------------------------------
+
+def test_replay_with_partial_identity_collapses_into_original():
+    live = Placed(R(2.0, shirt=None), video_start_s=1000, candidate_id=1)  # wide shot: number unreadable
+    replay = Placed(R(4.0, shirt=7, replay=True), video_start_s=1030, candidate_id=2)  # close-up replay reads it
+    assert collapse([live, replay]) == [live]
+
+
+def test_overlap_with_unknown_team_collapses():
+    a = Placed(R(9.0, team=None, shirt=None), video_start_s=1000, candidate_id=1)
+    b = Placed(R(3.0, team=None, shirt=None), video_start_s=1010, candidate_id=2)  # 4 s later
+    assert collapse([a, b]) == [a]
+
+
+def test_conflicting_identities_are_kept_apart():
+    a = Placed(R(5.0, shirt=7), video_start_s=1000, candidate_id=1)
+    b = Placed(R(8.0, shirt=10), video_start_s=1000, candidate_id=1)  # same team, different known shirts
+    assert len(collapse([a, b])) == 2
+
+
+def test_key_includes_name_when_shirt_unknown():
+    assert key(R(5.0, shirt=None, name="Bruno Fernandes"), 1000) != key(R(5.0, shirt=None, name="Mason Mount"), 1000)

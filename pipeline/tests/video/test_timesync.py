@@ -96,3 +96,18 @@ def test_round_trip_game_video_time():
 def test_game_time_needs_ok_sync():
     r = SyncResult(kickoff_offset_s=None, second_half_offset_s=None, status="needs_review")
     assert to_game_time(1000, r) is None and to_video_time(10, 0, r) is None
+
+
+def test_two_consistent_clusters_in_one_half_need_review():
+    """Part of the first half is 40 s off (e.g. a footballia part boundary): never pick one silently."""
+    class Split(FakeReader):
+        def read(self, png):
+            r = super().read(png)
+            t = float(Path(png).stem)
+            if r and KICKOFF + 1500 <= t < KICKOFF + 2700:  # later first-half samples read 40 s low
+                c = max(0, r.minute * 60 + r.second - 40)
+                return ClockReading(c // 60, c % 60, r.confidence)
+            return r
+
+    r = sync("m.mp4", DURATION, Split(jitter=0.5), samples=40, extract=fake_extract)
+    assert r.status == "needs_review"
