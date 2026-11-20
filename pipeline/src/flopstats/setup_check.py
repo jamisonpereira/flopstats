@@ -96,6 +96,20 @@ def _check_gemini(s: Settings, client: httpx.Client) -> str:
     return "key accepted (models listed)"
 
 
+def _check_footballia(s: Settings, client: httpx.Client) -> str:
+    from flopstats.footballia.download import USER_AGENT, LoginFailed, login
+
+    user = _require(s.footballia_username, "FOOTBALLIA_USERNAME")
+    password = _require(s.footballia_password, "FOOTBALLIA_PASSWORD")
+    # A fresh client (own cookie jar) so this really tests the credentials, not a saved session.
+    with httpx.Client(headers={"User-Agent": USER_AGENT}, follow_redirects=True, timeout=TIMEOUT) as fb:
+        try:
+            login(fb, user, password)
+        except LoginFailed as exc:
+            raise RuntimeError(str(exc)) from None
+    return "logged in"
+
+
 def check_all(settings: Settings, *, connect: Callable = db_connect) -> list[CheckResult]:
     secrets = settings.secret_values()
     results: list[CheckResult] = []
@@ -112,6 +126,5 @@ def check_all(settings: Settings, *, connect: Callable = db_connect) -> list[Che
         run("supabase-db", lambda: _check_db(settings, connect))
         run("supabase-storage", lambda: _check_storage(settings, client))
         run("gemini", lambda: _check_gemini(settings, client))
-    # Task 9 provides footballia.login(); until then the check is skipped.
-    results.append(CheckResult("footballia-login", True, "skipped (login() arrives in Task 9)", skipped=True))
+        run("footballia-login", lambda: _check_footballia(settings, client))
     return results

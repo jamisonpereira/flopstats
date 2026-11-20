@@ -7,6 +7,11 @@ from flopstats.setup_check import check_all
 AF_STATUS = "https://v3.football.api-sports.io/status"
 STORAGE = "https://example.supabase.co/storage/v1/bucket"
 GEMINI = "https://generativelanguage.googleapis.com/v1beta/models"
+FB_SIGN_IN = "https://footballia.eu/users/sign_in"
+SIGN_IN_HTML = (
+    '<form id="new_user" action="/users/sign_in?locale=en"><input name="authenticity_token" type="hidden" value="t"/>'
+    '<input id="user_email" name="user[email]"/><input name="user[password]"/><input name="commit" type="submit" value="Sign In"/></form>'
+)
 NAMES = ["api-football", "supabase-db", "supabase-storage", "gemini", "footballia-login"]
 
 
@@ -42,6 +47,8 @@ def _ok_routes(mock):
     )
     mock.get(STORAGE).respond(200, json=[{"name": "clips"}])
     mock.get(GEMINI).respond(200, json={"models": [{"name": "models/x"}]})
+    mock.get(FB_SIGN_IN).respond(200, text=SIGN_IN_HTML)
+    mock.post(FB_SIGN_IN, params={"locale": "en"}).respond(200, text='<a href="/users/sign_out">Sign out</a>')
 
 
 def _assert_no_secrets(results):
@@ -56,10 +63,9 @@ def test_check_all_reports_each_service(settings):
     results = check_all(settings, connect=fake_connect)
     assert [r.name for r in results] == NAMES
     by = {r.name: r for r in results}
-    for name in NAMES[:4]:
+    for name in NAMES:
         assert by[name].ok, by[name]
-    assert by["footballia-login"].skipped
-    assert "skipped" in by["footballia-login"].detail
+        assert not by[name].skipped
     _assert_no_secrets(results)
 
 
@@ -106,3 +112,13 @@ def test_check_all_missing_key_is_fail_not_crash(settings):
         by = {r.name: r for r in check_all(settings, connect=fake_connect)}
     assert by["gemini"].ok is False
     assert "GEMINI_KEY" in by["gemini"].detail
+
+
+@respx.mock
+def test_check_all_footballia_rejected_login_is_fail(settings):
+    _ok_routes(respx)
+    respx.post(FB_SIGN_IN, params={"locale": "en"}).respond(200, text="Invalid Email or password.")
+    by = {r.name: r for r in check_all(settings, connect=fake_connect)}
+    assert by["footballia-login"].ok is False
+    assert "rejected" in by["footballia-login"].detail
+    _assert_no_secrets([by["footballia-login"]])
