@@ -336,3 +336,35 @@ def test_windows_finished_before_a_crash_are_kept(db, world, tmp_path):
         runner.process_match(db, run, URL, make_deps(tmp_path, scorer=FailingScorer()))
     stored = {r[0] for r in db.execute("select start_s from windows")}
     assert 300 not in stored and {0, 290, 310} <= stored  # the rest of that batch was saved
+
+
+def test_windows_are_copied_from_one_working_copy_per_match(db, world, tmp_path):
+    run = runner.create_run(db, "pilot-v1", CONFIG.model_copy(update={"work_fps": 25, "work_height": 720}))
+    deps = make_deps(tmp_path)
+    made, windows, cuts = [], [], []
+
+    def working_copy(src, dest, *, keyframe_s, fps, height):
+        made.append((Path(src).name, keyframe_s, fps, height))
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        Path(dest).write_bytes(b"work")
+        return Path(dest)
+
+    def window(work, start, end, dest):
+        windows.append(Path(work).name)
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        Path(dest).write_bytes(b"w")
+        return Path(dest)
+
+    plain_cut = deps.cut
+
+    def cut(src, start, end, dest, reencode, *, audio=False):
+        cuts.append((Path(src).name, reencode))
+        return plain_cut(src, start, end, dest, reencode, audio=audio)
+
+    deps.working_copy, deps.window, deps.cut = working_copy, window, cut
+    rep = runner.process_match(db, run, URL, deps)
+    assert rep.status == "done"
+    assert made == [("match.mp4", 10.0, 25, 720)]  # once per match, keyframes on every window step
+    assert len(windows) == 599 and set(windows) == {"work.mp4"}
+    assert cuts and all(c == ("match.mp4", True) for c in cuts)  # segments and clips: the full-quality original
+    assert not (tmp_path / "work").exists() or not list((tmp_path / "work").rglob("work.mp4"))

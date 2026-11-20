@@ -167,7 +167,8 @@ def _build_deps(settings, cfg):
     return runner.Deps(storage=storage, scorer=DecisionScorer(key, cfg.scorer_model), verifiers=verifiers,
                        clock_reader=clock_reader, download=fetch, entry_for=runner.entry_from_listing,
                        probe_duration=ffmpeg.probe_duration, cut=ffmpeg.cut, frame_at=ffmpeg.frame_at,
-                       workdir=Path("data/work"), settings=settings)
+                       workdir=Path("data/work"), settings=settings,
+                       working_copy=ffmpeg.working_copy, window=ffmpeg.window)
 
 
 @run_app.command("create")

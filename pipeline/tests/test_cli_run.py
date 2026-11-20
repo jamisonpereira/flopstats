@@ -77,3 +77,15 @@ def test_build_deps_reads_the_clock_with_the_configured_gemini_model(tmp_path, m
     cfg = runner.RunConfig(**CFG)
     deps = cli._build_deps(settings, cfg)
     assert isinstance(deps.clock_reader, GeminiClockReader) and deps.clock_reader.name == "gemini-3.8-flash"
+
+
+def test_build_deps_scores_windows_from_a_working_copy(tmp_path, monkeypatch):
+    from pydantic import SecretStr
+
+    from flopstats.config import Settings
+    from flopstats.video import ffmpeg
+
+    monkeypatch.chdir(tmp_path)
+    settings = Settings(_env_file=None, gemini_key=SecretStr("k"), storage_backend="local", storage_local_root=str(tmp_path))
+    deps = cli._build_deps(settings, runner.RunConfig(**CFG))
+    assert deps.working_copy is ffmpeg.working_copy and deps.window is ffmpeg.window

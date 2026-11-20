@@ -63,6 +63,9 @@ class RunConfig(BaseModel):
     workers: int = Field(default=8, ge=1)
     # Reads the broadcast clock for time sync (needs an entry in prices).
     clock_model: str = "gemini-3.8-flash"
+    # Working copy the scorer's windows are copied from (verification and clips use the original).
+    work_fps: float = Field(default=25, gt=0)
+    work_height: int = Field(default=720, gt=0)
 
 
 @dataclass
@@ -78,6 +81,10 @@ class Deps:
     frame_at: Callable[[Path, float, Path], Path]
     workdir: Path
     settings: Settings
+    # Encode the match once and copy windows out of it (see video.ffmpeg.working_copy / window).
+    # None: cut and re-encode every window from the original.
+    working_copy: Callable[..., Path] | None = None
+    window: Callable[[Path, float, float, Path], Path] | None = None
 
 
 @dataclass
@@ -210,6 +217,16 @@ class _Ctx:
             raise RuntimeError("the full video is missing locally; re-run the download step")
         return Path(path)
 
+    def working_video(self) -> Path | None:
+        """The match encoded once for scoring, made on first use (None when deps don't provide one)."""
+        if self.deps.working_copy is None or self.deps.window is None:
+            return None
+        dest = self.dir / "work.mp4"
+        if not dest.exists():
+            self.deps.working_copy(self.local_video(), dest, keyframe_s=self.cfg.window_step_s,
+                                   fps=self.cfg.work_fps, height=self.cfg.work_height)
+        return dest
+
     def segment_file(self, cand_id: int, start: float, end: float) -> Path:
         dest = self.dir / "segments" / f"cand_{cand_id}_{int(start)}.mp4"
         if not dest.exists():
@@ -310,9 +327,15 @@ class _Ctx:
         done = {r[0] for r in self.conn.execute(
             "select start_s from windows where run_id = %s and video_id = %s", (self.run_id, self.video_id))}
         todo = [s for s in spans if float(s[0]) not in done]
+        work = self.working_video() if todo else None
+
         def score_one(span):
             start, end = span
-            seg = self.deps.cut(self.local_video(), start, end, self.dir / "windows" / f"win_{int(start)}.mp4", reencode=True)
+            dest = self.dir / "windows" / f"win_{int(start)}.mp4"
+            if work is not None:
+                seg = self.deps.window(work, start, end, dest)
+            else:
+                seg = self.deps.cut(self.local_video(), start, end, dest, reencode=True)
             try:
                 return span, self.deps.scorer.score(seg)
             except ContentBlocked:  # refused every time; the overlapping windows cover this footage
