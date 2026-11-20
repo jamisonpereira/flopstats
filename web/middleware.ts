@@ -1,10 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { localReviewBypass } from "@/lib/local-review";
 import { onSameHost } from "@/lib/paths";
 
 export const config = { matcher: ["/review/:path*", "/review"], runtime: "nodejs" };
 
 export async function middleware(request: NextRequest) {
+  if (localReviewBypass()) return NextResponse.next({ request });
   let response = NextResponse.next({ request });
   const supabase = createServerClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!, {
     cookies: {

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "review:local": "REVIEW_LOCAL=1 next dev --turbopack -H 127.0.0.1",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint"

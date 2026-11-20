@@ -2,6 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { localReviewBypass } from "@/lib/local-review";
 
 function env(name: string): string {
   const v = process.env[name];
@@ -9,8 +10,18 @@ function env(name: string): string {
   return v;
 }
 
-/** The signed-in user's client: every query runs under RLS (admins only, see 0006_review_access.sql). */
+/** The signed-in user's client: every query runs under RLS (admins only, see 0006_review_access.sql).
+ *  Local review (see local-review.ts) uses the service key instead, so no login is needed. */
 export async function userClient() {
+  if (localReviewBypass()) {
+    return createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_KEY"), {
+      auth: { persistSession: false },
+    }) as unknown as Awaited<ReturnType<typeof sessionClient>>;
+  }
+  return sessionClient();
+}
+
+async function sessionClient() {
   const store = await cookies();
   return createServerClient(env("SUPABASE_URL"), env("SUPABASE_ANON_KEY"), {
     cookies: {
