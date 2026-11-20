@@ -151,7 +151,8 @@ def test_process_match_end_to_end_with_fakes(db, world, tmp_path):
 
 
 def test_resume_after_crash_mid_verify(db, world, tmp_path):
-    run = runner.create_run(db, "pilot-v1", CONFIG)
+    # One call at a time, so the crash lands at a known point (parallel crashes: test_windows_finished_before_a_crash_are_kept).
+    run = runner.create_run(db, "pilot-v1", CONFIG.model_copy(update={"workers": 1}))
     scorer = FakeScorer()
     crashing = make_deps(tmp_path, scorer=scorer, verifier=FakeVerifier(fail_on_call=3))
     with pytest.raises(RuntimeError):
@@ -257,3 +258,81 @@ def test_a_blocked_window_is_stored_unscored_and_the_match_continues(db, world, 
     assert rep.status == "done"
     assert counts(db)["windows"] == 599
     assert db.execute("select score from windows where start_s = 3000").fetchone() == (None,)
+
+
+class ConcurrencyProbe:
+    """Records how many calls overlap; each call sleeps briefly so overlap is observable."""
+
+    def __init__(self):
+        import threading
+        self.lock, self.now, self.peak = threading.Lock(), 0, 0
+
+    def __enter__(self):
+        with self.lock:
+            self.now += 1
+            self.peak = max(self.peak, self.now)
+
+    def __exit__(self, *exc):
+        import time
+        time.sleep(0.005)
+        with self.lock:
+            self.now -= 1
+
+
+class SlowScorer(FakeScorer):
+    def __init__(self):
+        super().__init__()
+        self.probe = ConcurrencyProbe()
+
+    def score(self, segment):
+        with self.probe:
+            return super().score(segment)
+
+
+class SlowVerifier(FakeVerifier):
+    def __init__(self, name, probe):
+        super().__init__()
+        self.name, self.probe = name, probe
+
+    def verify(self, segment, context):
+        import time
+        with self.probe:
+            time.sleep(0.02)
+            return super().verify(segment, context)
+
+
+def test_windows_are_scored_in_parallel(db, world, tmp_path):
+    run = runner.create_run(db, "pilot-v1", CONFIG.model_copy(update={"workers": 4}))
+    scorer = SlowScorer()
+    rep = runner.process_match(db, run, URL, make_deps(tmp_path, scorer=scorer))
+    assert rep.status == "done"
+    assert counts(db)["windows"] == 599 and len(set(scorer.calls)) == 599
+    assert 1 < scorer.probe.peak <= 4
+
+
+def test_verifier_calls_run_in_parallel_and_each_is_stored_once(db, world, tmp_path):
+    cfg = CONFIG.model_copy(update={"workers": 4, "verifier_models": ["fake-verifier", "other"]})
+    run = runner.create_run(db, "pilot-v1", cfg)
+    probe = ConcurrencyProbe()
+    deps = make_deps(tmp_path)
+    deps.verifiers = [SlowVerifier("fake-verifier", probe), SlowVerifier("other", probe)]
+    rep = runner.process_match(db, run, URL, deps)
+    assert rep.status == "done"
+    assert 1 < probe.peak <= 4
+    rows = db.execute("select candidate_id, model, count(*) from verifications group by 1, 2").fetchall()
+    assert len(rows) == 8 and all(n == 1 for _, _, n in rows)  # 4 candidates x 2 models
+
+
+class FailingScorer(FakeScorer):
+    def score(self, segment):
+        if int(Path(segment).stem.split("_")[-1]) == 300:
+            raise RuntimeError("scorer crashed")
+        return super().score(segment)
+
+
+def test_windows_finished_before_a_crash_are_kept(db, world, tmp_path):
+    run = runner.create_run(db, "pilot-v1", CONFIG.model_copy(update={"workers": 4}))
+    with pytest.raises(RuntimeError):
+        runner.process_match(db, run, URL, make_deps(tmp_path, scorer=FailingScorer()))
+    stored = {r[0] for r in db.execute("select start_s from windows")}
+    assert 300 not in stored and {0, 290, 310} <= stored  # the rest of that batch was saved

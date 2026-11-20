@@ -26,6 +26,7 @@ from flopstats.config import Settings
 from flopstats.detect import candidates as cand_mod
 from flopstats.detect import dedupe, enrich, verify
 from flopstats.detect.gemini import ContentBlocked
+from flopstats.parallel import parallel as _parallel
 from flopstats.detect.priors import MatchEvent, window_priors
 from flopstats.detect.sim import SimWeights
 from flopstats.detect.verify import LineupPlayer, VerifyContext, VerifyResult
@@ -58,6 +59,8 @@ class RunConfig(BaseModel):
     sync_samples: int = 24
     # USD per 1M tokens per model, e.g. {"gemini-3.8-flash": {"input": 0.5, "output": 3}}.
     prices: dict[str, dict[str, float]] = Field(default_factory=dict)
+    # Model calls (window scoring, verification) made at the same time. Writes stay one at a time.
+    workers: int = Field(default=8, ge=1)
 
 
 @dataclass
@@ -305,32 +308,33 @@ class _Ctx:
         done = {r[0] for r in self.conn.execute(
             "select start_s from windows where run_id = %s and video_id = %s", (self.run_id, self.video_id))}
         todo = [s for s in spans if float(s[0]) not in done]
+        def score_one(span):
+            start, end = span
+            seg = self.deps.cut(self.local_video(), start, end, self.dir / "windows" / f"win_{int(start)}.mp4", reencode=True)
+            try:
+                return span, self.deps.scorer.score(seg)
+            except ContentBlocked:  # refused every time; the overlapping windows cover this footage
+                return span, None
+            finally:
+                Path(seg).unlink(missing_ok=True)
+
         for i in range(0, len(todo), BATCH):
             batch = todo[i: i + BATCH]
             self.guard(self._window_usd() * len(batch))
-            for start, end in batch:
-                seg = self.deps.cut(self.local_video(), start, end, self.dir / "windows" / f"win_{int(start)}.mp4", reencode=True)
+            for (start, end), r in _parallel(score_one, batch, self.cfg.workers):
                 prior = priors[(start, end)]
-                try:
-                    r = self.deps.scorer.score(seg)
-                except ContentBlocked:  # refused every time; the overlapping windows cover this footage
-                    with self.conn.transaction():
-                        self.conn.execute(
-                            "insert into windows (run_id, video_id, start_s, end_s, score, prior, final_score) values (%s, %s, %s, %s, null, %s, %s) "
-                            "on conflict (run_id, video_id, start_s) do nothing",
-                            (self.run_id, self.video_id, start, end, prior, cand_mod.final_score(0.0, prior, self.cfg.prior_weight)))
-                    Path(seg).unlink(missing_ok=True)
-                    continue
+                score = r.p_flop if r is not None else None
                 with self.conn.transaction():
                     self.conn.execute(
                         "insert into windows (run_id, video_id, start_s, end_s, score, prior, final_score) values (%s, %s, %s, %s, %s, %s, %s) "
                         "on conflict (run_id, video_id, start_s) do nothing",
-                        (self.run_id, self.video_id, start, end, r.p_flop, prior,
-                         cand_mod.final_score(r.p_flop, prior, self.cfg.prior_weight)))
-                    costs.record(self.conn, service="score", model=getattr(self.deps.scorer, "name", None), units=r.raw.get("usage", {}),
-                                 usd=r.usd, idempotency_key=f"window:{self.run_id}:{self.video_id}:{start}",
-                                 run_id=self.run_id, match_id=v["match_id"])
-                Path(seg).unlink(missing_ok=True)
+                        (self.run_id, self.video_id, start, end, score, prior,
+                         cand_mod.final_score(score or 0.0, prior, self.cfg.prior_weight)))
+                    if r is not None:
+                        costs.record(self.conn, service="score", model=getattr(self.deps.scorer, "name", None),
+                                     units=r.raw.get("usage", {}), usd=r.usd,
+                                     idempotency_key=f"window:{self.run_id}:{self.video_id}:{start}",
+                                     run_id=self.run_id, match_id=v["match_id"])
 
     def step_candidates(self) -> None:
         v = self.video()
@@ -368,18 +372,24 @@ class _Ctx:
     def step_verify(self) -> None:
         mc = self.match_context()
         context = self.verify_context(mc)
-        for cid, start, end in self.conn.execute(
-                "select id, start_s, end_s from candidates where run_id = %s and video_id = %s and status = 'pending' order by start_s",
-                (self.run_id, self.video_id)).fetchall():
-            self.guard(self._verify_usd() * len(self.deps.verifiers))
-            results = verify.run(self.conn, cid, self.segment_file(cid, start, end), self.deps.verifiers, context,
-                                 run_id=self.run_id, match_id=mc.id)
-            try:
-                is_flop = verify.primary(results, self.cfg.primary_verifier).is_flop
-            except LookupError:
-                is_flop = False
-            with self.conn.transaction():
-                self.conn.execute("update candidates set status = %s where id = %s", ("verified" if is_flop else "rejected", cid))
+        pending = self.conn.execute(
+            "select id, start_s, end_s from candidates where run_id = %s and video_id = %s and status = 'pending' order by start_s",
+            (self.run_id, self.video_id)).fetchall()
+        group = max(1, self.cfg.workers)
+        for i in range(0, len(pending), group):
+            chunk = pending[i: i + group]
+            self.guard(self._verify_usd() * len(self.deps.verifiers) * len(chunk))
+            items = [(cid, self.segment_file(cid, start, end)) for cid, start, end in chunk]
+            results = verify.run_many(self.conn, items, self.deps.verifiers, context, workers=self.cfg.workers,
+                                      run_id=self.run_id, match_id=mc.id)
+            for cid, _ in items:
+                try:
+                    is_flop = verify.primary(results[cid], self.cfg.primary_verifier).is_flop
+                except LookupError:
+                    is_flop = False
+                with self.conn.transaction():
+                    self.conn.execute("update candidates set status = %s where id = %s",
+                                      ("verified" if is_flop else "rejected", cid))
 
     def step_persist(self) -> None:
         mc = self.match_context()
