@@ -1,0 +1,65 @@
+import json
+from datetime import date
+
+from typer.testing import CliRunner
+
+from flopstats import cli, runner
+from flopstats.footballia.catalog import CatalogEntry
+
+CFG = {"candidate_threshold": 0.6, "prior_weight": 0.2, "confirm_threshold": 0.85, "review_threshold": 0.5,
+       "player_min_conf": 0.6, "scorer_model": "gemini-decision-1", "verifier_models": ["gemini-3.8-flash"],
+       "primary_verifier": "gemini-3.8-flash", "prices": {"gemini-3.8-flash": {"input": 0.5, "output": 3}}}
+
+
+def _patch(monkeypatch, db, settings):
+    monkeypatch.setattr(cli, "_settings", lambda: settings)
+    monkeypatch.setattr(cli, "_connect", lambda s: db)
+
+
+def test_run_create_and_status(db, settings, monkeypatch, tmp_path):
+    _patch(monkeypatch, db, settings)
+    f = tmp_path / "pilot.json"
+    f.write_text(json.dumps(CFG))
+    r = CliRunner().invoke(cli.app, ["run", "create", "--name", "pilot-v1", "--config", str(f)])
+    assert r.exit_code == 0, r.output
+    run_id = int(r.output.strip().split()[-1])
+    s = CliRunner().invoke(cli.app, ["run", "status", "--run", str(run_id)])
+    assert s.exit_code == 0 and "spent" in s.output and "open reviews: 0" in s.output
+
+
+def test_run_create_rejects_missing_thresholds(db, settings, monkeypatch, tmp_path):
+    _patch(monkeypatch, db, settings)
+    f = tmp_path / "bad.json"
+    f.write_text(json.dumps({"scorer_model": "x", "verifier_models": ["y"], "primary_verifier": "y"}))
+    assert CliRunner().invoke(cli.app, ["run", "create", "--name", "bad", "--config", str(f)]).exit_code != 0
+
+
+def test_run_season_limits_and_urls(db, settings, monkeypatch, tmp_path):
+    _patch(monkeypatch, db, settings)
+    run_id = runner.create_run(db, "pilot", runner.RunConfig(**CFG))
+    entries = [CatalogEntry(url=f"https://footballia.eu/matches/m{i}", home="A", away="B", date=date(2024, 9, i),
+                            competition="Premier League", season="2024-2025") for i in range(1, 6)]
+    monkeypatch.setattr("flopstats.footballia.catalog.list_season", lambda client, league, season, **kw: entries)
+    monkeypatch.setattr(cli, "_build_deps", lambda settings, cfg: object())
+    done = []
+    monkeypatch.setattr(runner, "process_match", lambda conn, run, url, deps: done.append(url) or runner.MatchReport("done"))
+    r = CliRunner().invoke(cli.app, ["run", "season", "--run", str(run_id), "--league", "39", "--season", "2024", "--limit", "2"])
+    assert r.exit_code == 0, r.output and done == [entries[0].url, entries[1].url]
+    done.clear()
+    urls = f"{entries[4].url},{entries[2].url}"
+    r = CliRunner().invoke(cli.app, ["run", "season", "--run", str(run_id), "--league", "39", "--season", "2024", "--urls", urls])
+    assert r.exit_code == 0, r.output
+    assert done == [entries[2].url, entries[4].url]  # listing order, restricted to --urls
+
+
+def test_run_season_stops_on_budget(db, settings, monkeypatch):
+    _patch(monkeypatch, db, settings)
+    run_id = runner.create_run(db, "pilot", runner.RunConfig(**CFG))
+    entries = [CatalogEntry(url=f"https://footballia.eu/matches/m{i}", home="A", away="B", date=date(2024, 9, i),
+                            competition="Premier League", season="2024-2025") for i in range(1, 4)]
+    monkeypatch.setattr("flopstats.footballia.catalog.list_season", lambda client, league, season, **kw: entries)
+    monkeypatch.setattr(cli, "_build_deps", lambda settings, cfg: object())
+    done = []
+    monkeypatch.setattr(runner, "process_match", lambda conn, run, url, deps: done.append(url) or runner.MatchReport("blocked_budget"))
+    r = CliRunner().invoke(cli.app, ["run", "season", "--run", str(run_id), "--league", "39", "--season", "2024"])
+    assert r.exit_code == 0 and len(done) == 1 and "budget" in r.output
