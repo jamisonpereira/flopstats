@@ -38,7 +38,9 @@ def test_core_tables_have_rls_and_no_policies(db):
     ).fetchall()
     rls = dict(rows)
     assert all(rls[t] for t in CORE_TABLES), {t for t in CORE_TABLES if not rls[t]}
-    assert _one(db, "select count(*) from pg_policies where schemaname = 'public'") == 0
+    # The only policies are the review screen's (0006): authenticated admins, gated on is_admin().
+    policies = db.execute("select roles::text[], coalesce(qual, '') || coalesce(with_check, '') from pg_policies where schemaname = 'public'").fetchall()
+    assert all(roles == ["authenticated"] and "is_admin()" in expr for roles, expr in policies), policies
 
 
 def test_updated_at_trigger_bumps_on_update(db):
