@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import shutil
 import statistics
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -175,6 +176,7 @@ class _Ctx:
     def __init__(self, conn, run_id, video_id, url, cfg: RunConfig, deps: Deps):
         self.conn, self.run_id, self.video_id, self.url, self.cfg, self.deps = conn, run_id, video_id, url, cfg, deps
         self.dir = Path(deps.workdir) / f"run{run_id}-video{video_id}"
+        self._download_lock = threading.Lock()
 
     # helpers ---------------------------------------------------------------------------
     def video(self) -> dict:
@@ -212,9 +214,13 @@ class _Ctx:
         return enrich.MatchContext(mid, home, away, lineup, events)
 
     def local_video(self) -> Path:
+        """The full video on this machine; downloaded again if it isn't here (a crash cleaned it
+        up, or the run moved to another machine after its download step)."""
         path = self.video()["local_path"]
         if not path or not Path(path).exists():
-            raise RuntimeError("the full video is missing locally; re-run the download step")
+            with self._download_lock:
+                self.step_download()
+            path = self.video()["local_path"]
         return Path(path)
 
     def working_video(self) -> Path | None:
@@ -328,6 +334,7 @@ class _Ctx:
             "select start_s from windows where run_id = %s and video_id = %s", (self.run_id, self.video_id))}
         todo = [s for s in spans if float(s[0]) not in done]
         work = self.working_video() if todo else None
+        original = self.local_video() if todo and work is None else None
 
         def score_one(span):
             start, end = span
@@ -335,7 +342,7 @@ class _Ctx:
             if work is not None:
                 seg = self.deps.window(work, start, end, dest)
             else:
-                seg = self.deps.cut(self.local_video(), start, end, dest, reencode=True)
+                seg = self.deps.cut(original, start, end, dest, reencode=True)
             try:
                 return span, self.deps.scorer.score(seg)
             except ContentBlocked:  # refused every time; the overlapping windows cover this footage

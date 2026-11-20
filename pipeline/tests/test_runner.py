@@ -368,3 +368,17 @@ def test_windows_are_copied_from_one_working_copy_per_match(db, world, tmp_path)
     assert len(windows) == 599 and set(windows) == {"work.mp4"}
     assert cuts and all(c == ("match.mp4", True) for c in cuts)  # segments and clips: the full-quality original
     assert not (tmp_path / "work").exists() or not list((tmp_path / "work").rglob("work.mp4"))
+
+
+def test_a_match_resumed_on_another_machine_downloads_its_video_again(db, world, tmp_path):
+    # The pilot moved from a MacBook to a Mac mini: the download step is done, but the file
+    # it recorded lives on the other machine.
+    run = runner.create_run(db, "pilot-v1", CONFIG)
+    first = make_deps(tmp_path / "macbook", verifier=FakeVerifier(fail_on_call=1))
+    with pytest.raises(RuntimeError):
+        runner.process_match(db, run, URL, first)
+    for p in (tmp_path / "macbook").rglob("match.mp4"):
+        p.unlink()
+    second = make_deps(tmp_path / "mini")
+    rep = runner.process_match(db, run, URL, second)
+    assert rep.status == "done" and second.downloads == [URL]
