@@ -9,7 +9,9 @@ the next run continue.
 
 from __future__ import annotations
 
+import os
 import shutil
+import socket
 import statistics
 import threading
 from collections.abc import Callable
@@ -138,21 +140,70 @@ def process_match(conn: psycopg.Connection, run_id: int, footballia_url: str, de
     with conn.transaction():
         conn.execute("insert into videos (source, source_url) values ('footballia', %s) on conflict do nothing", (footballia_url,))
     video_id = conn.execute("select id from videos where source = 'footballia' and source_url = %s", (footballia_url,)).fetchone()[0]
-    # One process per match: a second runner would pay for the same model calls again.
-    lock = match_lock_key(run_id, video_id)
-    if not conn.execute("select pg_try_advisory_lock(%s)", (lock,)).fetchone()[0]:
+    # One process per match: a second runner would pay for the same model calls again. A lease,
+    # renewed while the match runs, so a runner that dies (or loses its network) frees it in minutes.
+    holder = f"{socket.gethostname()}:{os.getpid()}:{threading.get_ident()}"
+    if not acquire_match(conn, run_id, video_id, holder):
         return MatchReport("busy", video_id, {})
+    stop = threading.Event()
+
+    def heartbeat() -> None:
+        while not stop.wait(MATCH_RENEW_S):
+            try:
+                renew_match(conn, run_id, video_id, holder)
+            except Exception:  # network gone: the step itself will fail; the lease just runs out
+                pass
+
+    beat = threading.Thread(target=heartbeat, daemon=True)
+    beat.start()
     try:
         return _process(conn, run_id, video_id, footballia_url, cfg, deps)
     finally:
-        conn.execute("select pg_advisory_unlock(%s)", (lock,))
+        stop.set()
+        try:
+            release_match(conn, run_id, video_id, holder)
+        except Exception:
+            pass  # unreachable database: the lease expires on its own
 
 
-def match_lock_key(run_id: int, video_id: int) -> int:
-    """A stable 63-bit advisory-lock key for (run, video)."""
-    import hashlib
+MATCH_LEASE_S = 300
+MATCH_RENEW_S = 60
 
-    return int.from_bytes(hashlib.sha256(f"flopstats:match:{run_id}:{video_id}".encode()).digest()[:8], "big") >> 1
+
+def _lock_key(run_id: int, video_id: int) -> str:
+    return f"lock:{run_id}:{video_id}"
+
+
+def acquire_match(conn: psycopg.Connection, run_id: int, video_id: int, holder: str,
+                  lease_s: int = MATCH_LEASE_S) -> bool:
+    """Take (or re-take) the match's lease unless another live holder has it."""
+    key = _lock_key(run_id, video_id)
+    with conn.transaction():
+        conn.execute("insert into jobs (kind, key) values ('match', %s) on conflict (kind, key) do nothing", (key,))
+        row = conn.execute(
+            "update jobs set status = 'running', locked_until = now() + make_interval(secs => %s), "
+            "payload = jsonb_build_object('holder', %s::text) "
+            "where kind = 'match' and key = %s and (status <> 'running' or locked_until is null "
+            "or locked_until < now() or payload->>'holder' = %s) returning id",
+            (lease_s, holder, key, holder)).fetchone()
+    return row is not None
+
+
+def renew_match(conn: psycopg.Connection, run_id: int, video_id: int, holder: str,
+                lease_s: int = MATCH_LEASE_S) -> bool:
+    row = conn.execute(
+        "update jobs set locked_until = now() + make_interval(secs => %s) "
+        "where kind = 'match' and key = %s and status = 'running' and payload->>'holder' = %s returning id",
+        (lease_s, _lock_key(run_id, video_id), holder)).fetchone()
+    return row is not None
+
+
+def release_match(conn: psycopg.Connection, run_id: int, video_id: int, holder: str) -> None:
+    conn.execute(
+        "update jobs set status = 'pending', locked_until = null "
+        "where kind = 'match' and key = %s and payload->>'holder' = %s",
+        (_lock_key(run_id, video_id), holder))
+
 
 
 def _process(conn, run_id: int, video_id: int, footballia_url: str, cfg: RunConfig, deps: Deps) -> MatchReport:

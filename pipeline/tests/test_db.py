@@ -20,3 +20,16 @@ def test_writes_through_connect_are_committed(db, settings):
     with psycopg.connect(LOCAL_DB_URL) as other:
         assert other.execute("select count(*) from jobs").fetchone()[0] == 1
         assert other.execute("select count(*) from cost_ledger").fetchone()[0] == 1
+
+
+def test_connections_notice_a_dead_network_instead_of_hanging(settings):
+    # Pilot 2: a home internet drop left the runner waiting forever on a dead connection.
+    settings.database_url = SecretStr(LOCAL_DB_URL)
+    conn = connect(settings)
+    try:
+        params = conn.info.get_parameters()
+        assert params.get("keepalives") == "1"
+        assert int(params["keepalives_idle"]) <= 30 and int(params["keepalives_count"]) <= 3
+        assert int(params["tcp_user_timeout"]) <= 60_000
+    finally:
+        conn.close()

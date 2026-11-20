@@ -230,18 +230,36 @@ def test_unknown_listing_link_item_is_resolvable(db, world, tmp_path):
 
 
 def test_concurrent_run_of_the_same_match_is_refused(db, world, tmp_path):
-    import psycopg
-
-    from conftest import LOCAL_DB_URL
-
     run = runner.create_run(db, "pilot-v1", CONFIG)
     deps = make_deps(tmp_path)
     video = _one(db, "insert into videos (source, source_url) values ('footballia', %s) returning id", URL)
-    with psycopg.connect(LOCAL_DB_URL, autocommit=True) as other:
-        assert other.execute("select pg_try_advisory_lock(%s)", (runner.match_lock_key(run, video),)).fetchone()[0]
-        rep = runner.process_match(db, run, URL, deps)
-        assert rep.status == "busy" and deps.scorer.calls == [] and deps.downloads == []
-    assert runner.process_match(db, run, URL, deps).status == "done"  # lock released with the other session
+    assert runner.acquire_match(db, run, video, holder="other-machine")
+    rep = runner.process_match(db, run, URL, deps)
+    assert rep.status == "busy" and deps.scorer.calls == [] and deps.downloads == []
+    runner.release_match(db, run, video, holder="other-machine")
+    assert runner.process_match(db, run, URL, deps).status == "done"
+
+
+def test_a_dead_runners_match_lease_expires_and_is_taken_over(db, world, tmp_path):
+    # Pilot 2: after an internet drop the server kept the dead runner's session-level locks, so a
+    # restarted run would have skipped those matches as "busy".
+    run = runner.create_run(db, "pilot-v1", CONFIG)
+    video = _one(db, "insert into videos (source, source_url) values ('footballia', %s) returning id", URL)
+    assert runner.acquire_match(db, run, video, holder="crashed-mini")
+    db.execute("update jobs set locked_until = now() - interval '1 second' where kind = 'match'")  # its lease ran out
+    assert runner.process_match(db, run, URL, make_deps(tmp_path)).status == "done"
+
+
+def test_a_lease_is_renewed_only_by_its_holder(db, world):
+    run = runner.create_run(db, "pilot-v1", CONFIG)
+    video = _one(db, "insert into videos (source, source_url) values ('footballia', %s) returning id", URL)
+    assert runner.acquire_match(db, run, video, holder="a", lease_s=5)
+    assert not runner.acquire_match(db, run, video, holder="b")
+    assert runner.renew_match(db, run, video, holder="a", lease_s=600)
+    assert not runner.renew_match(db, run, video, holder="b", lease_s=600)
+    left = _one(db, "select extract(epoch from locked_until - now()) from jobs where kind = 'match'")
+    assert left > 500
+    assert _one(db, "select count(*) from jobs where key like %s", f"{run}:%") == 0  # not counted as a step
 
 
 class BlockingScorer(FakeScorer):

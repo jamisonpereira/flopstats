@@ -154,3 +154,11 @@ def test_gemini_clock_reader_no_clock_or_garbage(tmp_path):
     for answer in ({"visible": False}, {"visible": True, "minute": 51}, {"visible": True, "minute": 51, "second": 75}):
         respx.post(generate_url("gemini-3.8-flash")).mock(return_value=_gen_clock(answer))
         assert reader.read(png) is None
+
+
+@respx.mock
+def test_a_lost_connection_is_a_network_error(segment):
+    from flopstats.detect.gemini import NetworkError
+    respx.post(DECISIONS_URL).mock(side_effect=httpx.ConnectError("no route"))
+    with pytest.raises(NetworkError):
+        DecisionScorer(KEY, sleep=lambda s: None).score(segment)

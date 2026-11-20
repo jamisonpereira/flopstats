@@ -136,3 +136,58 @@ def test_run_season_parallel_stops_starting_matches_on_budget(db, settings, monk
     r = CliRunner().invoke(cli.app, ["run", "season", "--run", str(run_id), "--season", "2024", "--parallel", "2"])
     assert r.exit_code == 0, r.output
     assert len(started) <= 2 and "budget reached" in r.output
+
+
+def test_run_season_waits_out_a_network_drop_and_retries_the_match(db, settings, monkeypatch):
+    import psycopg
+
+    _patch(monkeypatch, db, settings)
+    run_id = runner.create_run(db, "pilot", runner.RunConfig(**CFG))
+    entries = _season_entries(3)
+    monkeypatch.setattr("flopstats.footballia.catalog.list_season", lambda client, league, season, **kw: entries)
+    monkeypatch.setattr(cli, "_build_deps", lambda settings, cfg: object())
+    from conftest import LOCAL_DB_URL
+
+    slept, connects, calls = [], [], []
+    monkeypatch.setattr(cli, "_sleep", slept.append)
+    monkeypatch.setattr(cli, "_connect", lambda s: connects.append(1) or psycopg.connect(LOCAL_DB_URL, autocommit=True))
+
+    def process(conn, run, url, deps):
+        calls.append(url)
+        if url.endswith("m2") and calls.count(url) == 1:
+            raise psycopg.OperationalError("server closed the connection unexpectedly")
+        return runner.MatchReport("done")
+
+    monkeypatch.setattr(runner, "process_match", process)
+    r = CliRunner().invoke(cli.app, ["run", "season", "--run", str(run_id), "--season", "2024"])
+    assert r.exit_code == 0, r.output
+    assert calls.count(entries[1].url) == 2  # retried, not skipped
+    assert "'done': 3" in r.output and "error" not in r.output.split("season")[-1]
+    assert len(connects) >= 2  # reconnected after the drop
+    assert "network" in r.output.lower()
+
+
+def test_run_season_gives_up_on_a_match_that_keeps_losing_the_network(db, settings, monkeypatch):
+    import httpx
+
+    _patch(monkeypatch, db, settings)
+    run_id = runner.create_run(db, "pilot", runner.RunConfig(**CFG))
+    entries = _season_entries(2)
+    monkeypatch.setattr("flopstats.footballia.catalog.list_season", lambda client, league, season, **kw: entries)
+    monkeypatch.setattr(cli, "_build_deps", lambda settings, cfg: object())
+    monkeypatch.setattr(cli, "_sleep", lambda s: None)
+    import psycopg
+
+    from conftest import LOCAL_DB_URL
+
+    monkeypatch.setattr(cli, "_connect", lambda s: psycopg.connect(LOCAL_DB_URL, autocommit=True))
+
+    def process(conn, run, url, deps):
+        if url.endswith("m1"):
+            raise httpx.ReadTimeout("timed out")
+        return runner.MatchReport("done")
+
+    monkeypatch.setattr(runner, "process_match", process)
+    r = CliRunner().invoke(cli.app, ["run", "season", "--run", str(run_id), "--season", "2024"])
+    assert r.exit_code == 0, r.output
+    assert "'error': 1" in r.output and "'done': 1" in r.output

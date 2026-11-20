@@ -50,6 +50,10 @@ class DecisionError(RuntimeError):
     pass
 
 
+class NetworkError(DecisionError):
+    """The request never got an answer (connection refused, dropped or timed out)."""
+
+
 class ContentBlocked(DecisionError):
     """The API refused this input under its content policy. Retrying the same input doesn't help."""
 
@@ -93,7 +97,7 @@ def post_json(http: httpx.Client, url: str, body: dict, key: str, sleep: Callabl
         except httpx.TransportError as exc:
             server_errors += 1
             if server_errors > RETRIES:
-                raise DecisionError(f"request failed ({type(exc).__name__})") from None
+                raise NetworkError(f"request failed ({type(exc).__name__})") from None
             sleep(2.0 ** (server_errors - 1))
             continue
         if resp.status_code == 429 and rate_limits < RATE_LIMIT_RETRIES:

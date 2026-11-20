@@ -21,6 +21,42 @@ def _settings():
     return Settings()
 
 
+def _sleep(seconds: float) -> None:
+    import time
+
+    time.sleep(seconds)
+
+
+NETWORK_RETRIES = 3          # outages one match may hit before it's counted as an error
+NETWORK_WAIT_MAX_S = 6 * 3600  # how long to wait for the network to come back
+NETWORK_BACKOFF_S = (5, 15, 30, 60)
+
+
+def _is_network_error(exc: BaseException) -> bool:
+    import httpx
+    import psycopg
+
+    from flopstats.detect.gemini import NetworkError
+
+    return isinstance(exc, (psycopg.OperationalError, httpx.TransportError, NetworkError, ConnectionError, TimeoutError))
+
+
+def _wait_for_network(settings):
+    """A fresh database connection once the network is back (gives up after NETWORK_WAIT_MAX_S)."""
+    waited, attempt = 0.0, 0
+    while True:
+        try:
+            conn = _connect(settings)
+            conn.execute("select 1")
+            return conn
+        except Exception as exc:
+            if not _is_network_error(exc) or waited >= NETWORK_WAIT_MAX_S:
+                raise
+        pause = NETWORK_BACKOFF_S[min(attempt, len(NETWORK_BACKOFF_S) - 1)]
+        _sleep(pause)
+        waited, attempt = waited + pause, attempt + 1
+
+
 def _connect(settings):
     from flopstats.db import connect
 
@@ -239,12 +275,28 @@ def run_season(
                 if not pending:
                     return
                 e = pending.pop(0)
-            try:
-                rep = runner.process_match(wconn, run, e.url, deps)
-            except Exception as exc:  # recorded on the step's job; carry on with the next match
-                with lock:
-                    typer.echo(f"{e.url}: error {type(exc).__name__}: {exc}", err=True)
-                    summary["error"] = summary.get("error", 0) + 1
+            outages = 0
+            while True:
+                try:
+                    rep = runner.process_match(wconn, run, e.url, deps)
+                    break
+                except Exception as exc:
+                    if _is_network_error(exc) and outages < NETWORK_RETRIES:
+                        outages += 1
+                        with lock:
+                            typer.echo(f"{e.url}: network problem ({type(exc).__name__}); waiting for it to come back")
+                        try:
+                            wconn.close()
+                        except Exception:
+                            pass
+                        wconn = _wait_for_network(settings)
+                        continue  # the match resumes from its last finished step
+                    rep = None
+                    with lock:  # recorded on the step's job; carry on with the next match
+                        typer.echo(f"{e.url}: error {type(exc).__name__}: {exc}", err=True)
+                        summary["error"] = summary.get("error", 0) + 1
+                    break
+            if rep is None:
                 continue
             with lock:
                 summary[rep.status] = summary.get(rep.status, 0) + 1
