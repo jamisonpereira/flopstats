@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Divestats compare and desktop home v1</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--paper:#f4f1ea;--grid:#e3ded2;--ink:#121212;--muted:#5d5a54;--card:#fff;--hazard:#ff4f1f;--hazard-soft:#ffe1d6;--pitch:#2f6b3a;--nofoot:#b9b4a8;--gold:#d8b45a;--blue:#2a5bd7;--mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#d9d6cf;font-family:var(--sans);color:var(--ink);padding:20px 12px 60px}
+  .intro{max-width:900px;margin:0 auto 18px;font-size:14px;line-height:1.45;color:#3a3833}.intro h1{font-size:20px;margin-bottom:6px}
+  .row{display:flex;flex-wrap:wrap;gap:26px;justify-content:center;align-items:flex-start;margin-bottom:34px}
+  .label{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:#55524b;margin:0 0 8px 4px}
+  .paper{background:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:16px 16px}
+  .phone{width:375px;border-radius:20px;overflow:hidden;box-shadow:0 12px 34px rgba(0,0,0,.2);position:relative}
+  .bar{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:2px solid var(--ink);background:var(--paper)}
+  .wm{display:flex;align-items:stretch;font:600 17px var(--mono);letter-spacing:-.02em;line-height:1}
+  .wm .d{background:var(--hazard);color:#fff;padding:4px 5px 3px}.wm .s{border:2px solid var(--ink);border-left:0;padding:2px 5px 1px}
+  .bar .r{display:flex;gap:10px;align-items:center;font:600 10px var(--mono)}
+  .burger{width:22px;height:14px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);position:relative}.burger::after{content:'';position:absolute;left:0;right:0;top:4px;border-top:2px solid var(--ink)}
+  .tabbar{position:sticky;bottom:0;display:grid;grid-template-columns:repeat(5,1fr);border-top:2px solid var(--ink);background:var(--paper);margin-top:16px}
+  .tabbar div{text-align:center;padding:8px 0 10px;font:600 9px var(--mono);text-transform:uppercase}
+  .tabbar div i{display:block;width:18px;height:18px;margin:0 auto 3px;border:2px solid var(--ink)}
+  .tabbar .on{color:var(--hazard)}.tabbar .on i{background:var(--hazard)}
+  .pt{padding:14px 14px 4px}.pt h1{font-size:26px;line-height:1}.pt p{font:400 10.5px var(--mono);color:var(--muted);margin-top:4px}
+  .h3{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.1em;padding:16px 14px 6px;display:flex;justify-content:space-between}
+  .h3 a{font-weight:400;color:var(--muted);text-decoration:underline;text-transform:none;letter-spacing:0}
+  .seg{display:flex;margin:10px 14px 0;border:2px solid var(--ink);background:var(--card)}
+  .seg span{flex:1;text-align:center;font:600 10.5px var(--mono);padding:7px 0;text-transform:uppercase;border-right:1px solid var(--ink)}.seg span:last-child{border:0}.seg span.on{background:var(--ink);color:var(--paper)}
+  /* builder */
+  .slots{margin:12px 14px 0;display:grid;grid-template-columns:1fr 28px 1fr;align-items:center}
+  .slot{border:2px solid var(--ink);background:var(--card);height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px}
+  .slot .ph{width:44px;height:44px;border:2px solid var(--ink);background:#cfc9bb;margin-bottom:6px}
+  .slot b{font-size:13px}.slot span{font:400 9.5px var(--mono);color:var(--muted)}
+  .slot.empty{border-style:dashed;background:transparent}.slot.empty .ph{border-style:dashed;background:transparent;display:flex;align-items:center;justify-content:center;font:600 18px var(--mono)}
+  .slots .x{font:600 11px var(--mono);text-align:center}
+  .search{margin:10px 14px 0;border:2px solid var(--ink);background:var(--card);padding:9px 10px;font:400 12px var(--mono);color:var(--muted)}
+  .sugg{margin:0 14px;background:var(--card);border:2px solid var(--ink)}
+  .sugg .s{display:grid;grid-template-columns:1fr auto;padding:9px 10px;border-bottom:1px solid var(--grid);font-size:13px;align-items:center}
+  .sugg .s:last-child{border:0}.sugg .s b{font-weight:600}.sugg .s span{font:400 9.5px var(--mono);color:var(--muted);display:block}
+  .sugg .s i{font:600 10px var(--mono);font-style:normal;border:2px solid var(--ink);padding:3px 7px}
+  .sugg .s .k{color:var(--hazard)}
+  /* compare result */
+  .vsh{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid var(--ink);background:var(--card);position:relative}
+  .vsh .sd{padding:12px 10px;text-align:center}.vsh .sd+.sd{border-left:2px solid var(--ink)}
+  .vsh .ph{width:56px;height:62px;margin:0 auto 6px;border:2px solid var(--ink);background:repeating-linear-gradient(180deg,#f4f1ea 0 7px,#121212 7px 8px)}
+  .vsh b{display:block;font-size:15px}.vsh span{font:400 9.5px var(--mono);color:var(--muted)}
+  .vsh .sim{font:600 28px var(--mono);margin-top:4px;line-height:1}
+  .vsh .a .sim{color:var(--hazard)}.vsh .b .sim{color:var(--blue)}
+  .vsh .vs{position:absolute;left:50%;top:44px;transform:translateX(-50%);background:var(--ink);color:#fff;font:600 10px var(--mono);padding:4px 6px}
+  .verdict{margin:12px auto 0;width:max-content;border:3px solid var(--hazard);color:var(--hazard);font:600 13px var(--mono);padding:4px 10px;transform:rotate(-3deg);background:#fff;text-align:center;line-height:1.25}
+  .verdict small{display:block;font-size:9px;color:var(--ink)}
+  .tug{margin:12px 14px 0;background:var(--card);border:2px solid var(--ink);padding:4px 10px}
+  .tg{display:grid;grid-template-columns:38px 1fr 38px;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--grid)}
+  .tg:last-child{border:0}
+  .tg b{font:600 12px var(--mono)}.tg b.r{text-align:right}
+  .tg .mid{text-align:center}.tg .mid span{font:400 8.5px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .tg .bars{display:flex;height:8px;margin-top:3px}.tg .bars i{background:var(--hazard)}.tg .bars s{background:var(--blue);flex:1}
+  .cov{margin:6px 14px 0;font:400 9.5px var(--mono);color:var(--muted)}
+  .maps{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 14px}
+  .map{border:2px solid var(--ink);background:var(--pitch);height:104px;position:relative}
+  .map .cap{position:absolute;left:4px;top:4px;font:600 8.5px var(--mono);background:rgba(244,241,234,.92);padding:1px 4px}
+  .met{margin:0 14px;background:var(--card);border:2px solid var(--ink)}
+  .met .m{display:grid;grid-template-columns:1fr auto;padding:8px 10px;border-bottom:1px solid var(--grid);font:400 11px var(--mono);align-items:center}
+  .met .m:last-child{border:0}.met .m b{font-weight:600}
+  .met .m.nf{color:var(--nofoot);background:repeating-linear-gradient(135deg,#fff 0 6px,#f3f1ec 6px 12px)}
+  .dots i{display:inline-block;width:9px;height:9px;margin-left:2px}.dots .a{background:var(--hazard)}.dots .b{background:var(--blue)}
+  .pub{margin:0 14px;border:2px solid var(--ink);background:var(--hazard-soft);padding:10px}
+  .pub .q{font-weight:700;font-size:14px}.pub .sub{font:400 9.5px var(--mono);color:var(--muted)}
+  .pub .btns{display:flex;gap:8px;margin-top:8px}.pub .btns div{flex:1;text-align:center;border:2px solid var(--ink);background:#fff;padding:8px;font:600 11px var(--mono)}
+  .cta{display:flex;gap:8px;margin:14px 14px 0}
+  .btn{flex:1;text-align:center;padding:11px 6px;font-weight:700;font-size:13px;border:2px solid var(--ink);background:var(--card)}.btn.p{background:var(--hazard);color:#fff}
+  /* desktop */
+  .desk-wrap{width:100%;max-width:1220px;margin:0 auto;overflow:hidden}
+  .desk{width:1200px;transform-origin:top left;border-radius:12px;overflow:hidden;box-shadow:0 12px 34px rgba(0,0,0,.2)}
+  .chrome{background:#e7e4dd;padding:8px 12px;display:flex;gap:6px;align-items:center;border-bottom:1px solid #ccc}
+  .chrome i{width:10px;height:10px;border-radius:50%;background:#c9c5bc}.chrome span{margin-left:12px;font:400 11px var(--mono);color:#777;background:#fff;padding:3px 10px;border-radius:5px;flex:1;max-width:340px}
+  .dnav{display:flex;align-items:center;gap:26px;padding:14px 28px;border-bottom:2px solid var(--ink);background:var(--paper)}
+  .dnav .wm{font-size:20px}.dnav small{font:500 8px var(--mono);letter-spacing:.1em;color:var(--muted);display:block;margin-top:4px}
+  .dnav nav{display:flex;gap:22px;font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;flex:1}
+  .dnav nav .on{color:var(--hazard);border-bottom:2px solid var(--hazard)}
+  .dnav .sc{font:600 11px var(--mono);border:2px solid var(--ink);padding:5px 10px;background:#fff}
+  .dticker{background:var(--ink);color:var(--paper);font:500 11px var(--mono);padding:7px 28px;letter-spacing:.04em}.dticker b{color:var(--hazard)}
+  .dmain{display:grid;grid-template-columns:1fr 330px;gap:24px;padding:22px 28px 28px}
+  .dcase{background:var(--card);border:2px solid var(--ink);display:grid;grid-template-columns:1.25fr 1fr}
+  .dcase .media{background:var(--pitch);min-height:330px;position:relative;border-right:2px solid var(--ink)}
+  .dcase .media .mode{position:absolute;left:10px;top:10px;display:flex;gap:4px}
+  .dcase .media .mode span{font:600 10px var(--mono);background:rgba(244,241,234,.92);padding:3px 7px;border:1px solid var(--ink)}.dcase .media .mode .on{background:var(--ink);color:#fff}
+  .stamp{position:absolute;right:14px;bottom:16px;transform:rotate(-9deg);border:3px solid var(--hazard);color:var(--hazard);font:600 18px var(--mono);padding:4px 10px;background:rgba(244,241,234,.93)}
+  .dcase .info{padding:16px}
+  .dcase .k{display:flex;justify-content:space-between;font:600 10.5px var(--mono);text-transform:uppercase;letter-spacing:.1em}
+  .dcase .k span:last-child{background:var(--ink);color:#fff;padding:1px 6px}
+  .dcase h2{font-size:30px;margin-top:10px;line-height:1}.dcase .cs{font:400 11px var(--mono);color:var(--muted);margin-top:4px}
+  .dcase .fd{margin-top:12px;padding:9px 10px;border-left:4px solid var(--hazard);background:var(--paper);font-size:13.5px;line-height:1.4}
+  .g4{display:grid;grid-template-columns:repeat(4,1fr);border:2px solid var(--ink);margin-top:12px}
+  .g4 div{padding:7px;border-right:1px solid var(--ink)}.g4 div:last-child{border:0}.g4 b{display:block;font:600 19px var(--mono)}.g4 span{font-size:9px;text-transform:uppercase;color:var(--muted)}
+  .g4 .sim{background:var(--ink);color:#fff}.g4 .sim b{filter:blur(5px)}.g4 .sim span{color:#ff9b7a}
+  .drate{margin-top:12px;border:2px dashed var(--ink);padding:10px}
+  .drate .q{font:600 10.5px var(--mono);text-transform:uppercase;letter-spacing:.06em}
+  .track{height:12px;border:2px solid var(--ink);margin:12px 0 8px;position:relative;background:repeating-linear-gradient(90deg,#fff 0 9.5%,var(--ink) 9.5% 10%)}
+  .knob{position:absolute;left:44%;top:-8px;width:22px;height:22px;background:var(--hazard);border:2px solid var(--ink)}
+  .drate .row2{display:flex;gap:8px}.drate .row2 div{flex:1;text-align:center;padding:8px;font:600 12px var(--mono);border:2px solid var(--ink)}
+  .drate .row2 .p{background:var(--ink);color:#fff}
+  .dsec{display:flex;justify-content:space-between;align-items:baseline;margin:24px 0 10px}
+  .dsec h3{font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.1em}.dsec h3 span{background:var(--ink);color:var(--paper);padding:2px 6px;margin-right:8px}
+  .dsec a{font:400 11px var(--mono);color:var(--muted);text-decoration:underline}
+  .hgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .hc{background:var(--card);border:2px solid var(--ink);padding:12px}
+  .hc .k{font:600 9.5px var(--mono);text-transform:uppercase;color:var(--hazard);letter-spacing:.08em}
+  .hc .v{display:flex;justify-content:space-between;align-items:center;margin:10px 0}.hc .v b{font-size:14px}.hc .v span{font:600 20px var(--mono)}
+  .hc .m{font:400 10px var(--mono);color:var(--muted);border-top:1px solid var(--grid);padding-top:6px}
+  .two{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}
+  .dtrial{background:var(--card);border:2px solid var(--ink);padding:12px}
+  .dtrial .q{font-weight:700;font-size:17px}.dtrial .s{font:400 10px var(--mono);color:var(--muted)}
+  .dtrial .p2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .dtrial .c{border:2px solid var(--ink)}.dtrial .c .mm{height:130px;background:var(--pitch)}.dtrial .c .b{padding:8px;font-size:12.5px}.dtrial .c .b span{display:block;font:400 10px var(--mono);color:var(--muted)}
+  .dtrial .c .vt{margin:0 8px 8px;text-align:center;border:2px solid var(--ink);background:var(--grid);font:600 11px var(--mono);padding:6px;color:var(--muted)}
+  .ddock{background:var(--card);border:2px solid var(--ink);font:400 11.5px var(--mono)}
+  .ddock .m{display:grid;grid-template-columns:1fr auto;padding:8px 12px;border-bottom:1px solid var(--grid)}.ddock .m:last-child{border:0}
+  .ddock .m.nf{color:var(--nofoot);background:repeating-linear-gradient(135deg,#fff 0 6px,#f3f1ec 6px 12px)}
+  .ddock .pill{font-weight:600;font-size:10px;padding:1px 6px;border:1.5px solid currentColor}
+  .rail .box{background:var(--card);border:2px solid var(--ink);margin-bottom:18px}
+  .rail .bh{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.1em;padding:9px 12px;border-bottom:2px solid var(--ink);display:flex;justify-content:space-between}
+  .rail .chips{display:flex;gap:5px;padding:8px 12px;border-bottom:1px solid var(--grid)}.rail .chips span{font:600 9.5px var(--mono);border:1.5px solid var(--ink);padding:2px 6px}.rail .chips .on{background:var(--ink);color:#fff}
+  .rail .r{display:grid;grid-template-columns:18px 1fr 70px 36px;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--grid);font-size:13px}.rail .r:last-child{border:0}
+  .rail .r .n{font:600 11px var(--mono)}.rail .r span.t{font:400 9.5px var(--mono);color:var(--muted);display:block}
+  .rail .r i{height:7px;background:var(--grid);display:block}.rail .r i s{display:block;height:7px;background:var(--ink)}.rail .r:nth-child(3) i s{background:var(--hazard)}
+  .rail .r .v{font:600 12.5px var(--mono);text-align:right}
+  .rail .ad{height:250px;border:1.5px dashed var(--nofoot);display:flex;align-items:center;justify-content:center;font:400 10px var(--mono);color:var(--nofoot);text-transform:uppercase;letter-spacing:.1em;margin-bottom:18px}
+  .rail .aw{background:#121212;color:#f4f1ea;border:2px solid var(--ink);padding:12px;margin-bottom:18px}
+  .rail .aw h4{font:600 10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}.rail .aw .t{font-size:17px;font-weight:700;margin:4px 0 8px}
+  .rail .aw .l{display:grid;grid-template-columns:90px 1fr 30px;gap:8px;align-items:center;font-size:11.5px;margin:5px 0}.rail .aw .l i{height:9px;background:var(--gold);display:block}.rail .aw .l span{font:600 10.5px var(--mono);text-align:right}
+.summary{margin:12px 14px 0;padding:8px 10px;background:var(--card);border:2px solid var(--ink);font-size:13px;text-align:center}.summary b{color:var(--hazard)}
+</style>
+</head>
+<body>
+<div class="intro">
+  <h1>Compare and desktop home, v1</h1>
+  Row 1: the Compare tab before you've picked (left) and a finished comparison (right). Row 2: the home page on a desktop screen, shrunk to fit. All data invented.
+</div>
+
+<div class="row">
+<div>
+<p class="label">Compare tab: picking</p>
+<div class="phone paper">
+  <div class="bar"><div class="wm"><span class="d">DIVE</span><span class="s">STATS</span></div><div class="r"><div class="burger"></div></div></div>
+  <div class="pt"><h1>Open a hearing</h1><p>Put two parties before the Institute</p></div>
+  <div class="seg"><span class="on">Players</span><span>Clubs</span><span>Nations</span></div>
+  <div class="slots">
+    <div class="slot"><div class="ph"></div><b>M. Vellani</b><span>Northbridge · 100</span></div>
+    <div class="x">VS</div>
+    <div class="slot empty"><div class="ph">+</div><b>Pick a side</b><span>search or choose below</span></div>
+  </div>
+  <div class="search">⌕ Search players…</div>
+  <div class="h3"><span>Suggested for Vellani</span></div>
+  <div class="sugg">
+    <div class="s"><div><b>T. Lindqvist</b><span>Closest rival · #2 in PL</span></div><i>Pick</i></div>
+    <div class="s"><div><b>A. Mensah</b><span>Teammate · Northbridge</span></div><i>Pick</i></div>
+    <div class="s"><div><b>Calder Utd's top offender</b><span>J. Okafor-Price · they meet Saturday</span></div><i>Pick</i></div>
+  </div>
+  <div class="h3"><span>Hearings everyone's opening</span><a>More</a></div>
+  <div class="sugg">
+    <div class="s"><div><b>Northbridge v Calder Utd</b><span class="k">This weekend · 4.1k opened</span></div><i>Open</i></div>
+    <div class="s"><div><b>Italy v Spain</b><span>Nations · all leagues</span></div><i>Open</i></div>
+  </div>
+  <div class="tabbar"><div><i></i>Today</div><div><i></i>Rankings</div><div class="on"><i></i>Compare</div><div><i></i>Awards</div><div><i></i>More</div></div>
+</div>
+</div>
+
+<div>
+<p class="label">Compare: the hearing</p>
+<div class="phone paper">
+  <div class="bar"><div class="wm"><span class="d">DIVE</span><span class="s">STATS</span></div><div class="r"><span>PL 23/24 ▾</span><div class="burger"></div></div></div>
+  <div class="vsh">
+    <div class="sd a"><div class="ph"></div><b>M. Vellani</b><span>Northbridge</span><div class="sim">100</div></div>
+    <div class="sd b"><div class="ph"></div><b>T. Lindqvist</b><span>Harrow Ath.</span><div class="sim">88.7</div></div>
+    <div class="vs">VS</div>
+  </div>
+  <div class="summary">Vellani has the higher SIM per 90, by <b>13%</b></div>
+  <div class="tug">
+    <div class="tg"><b>23</b><div class="mid"><span>Cases</span><div class="bars"><i style="width:52%"></i><s></s></div></div><b class="r">21</b></div>
+    <div class="tg"><b>1.31</b><div class="mid"><span>Per 90</span><div class="bars"><i style="width:56%"></i><s></s></div></div><b class="r">1.03</b></div>
+    <div class="tg"><b>34s</b><div class="mid"><span>Avg grounded</span><div class="bars"><i style="width:43%"></i><s></s></div></div><b class="r">45s</b></div>
+    <div class="tg"><b>8.4</b><div class="mid"><span>Avg acting</span><div class="bars"><i style="width:55%"></i><s></s></div></div><b class="r">6.9</b></div>
+    <div class="tg"><b>4</b><div class="mid"><span>Pens won</span><div class="bars"><i style="width:80%"></i><s></s></div></div><b class="r">1</b></div>
+  </div>
+  <div class="cov">Studied minutes: 1,580 v 1,840 · per-90 uses studied minutes only</div>
+  <div class="h3"><span>Where they go down</span></div>
+  <div class="maps">
+    <div class="map"><span class="cap">VELLANI</span><svg viewBox="0 0 160 104" width="100%" height="100%" fill="none" stroke="rgba(233,242,228,.6)"><rect x="3" y="3" width="154" height="98"/><rect x="128" y="27" width="29" height="50"/><g fill="#ff4f1f" stroke="none"><circle cx="135" cy="35" r="3.5"/><circle cx="140" cy="44" r="3.5"/><circle cx="132" cy="52" r="3.5"/><circle cx="120" cy="20" r="3"/><circle cx="145" cy="60" r="3.5"/></g></svg></div>
+    <div class="map"><span class="cap">LINDQVIST</span><svg viewBox="0 0 160 104" width="100%" height="100%" fill="none" stroke="rgba(233,242,228,.6)"><rect x="3" y="3" width="154" height="98"/><rect x="128" y="27" width="29" height="50"/><g fill="#7fa4ff" stroke="none"><circle cx="70" cy="50" r="3.5"/><circle cx="85" cy="40" r="3.5"/><circle cx="60" cy="70" r="3.5"/><circle cx="95" cy="60" r="3"/><circle cx="110" cy="30" r="3.5"/></g></svg></div>
+  </div>
+  <div class="h3"><span>When they met</span><span>3 matches</span></div>
+  <div class="met">
+    <div class="m"><span><b>Northbridge 2–1 Harrow Ath.</b> · Sep</span><span class="dots"><i class="a"></i><i class="a"></i><i class="b"></i></span></div>
+    <div class="m nf"><span>Harrow Ath. 0–0 Northbridge · Jan</span><span>No footage</span></div>
+    <div class="m"><span><b>Northbridge 1–3 Harrow Ath.</b> · Apr</span><span class="dots"><i class="b"></i><i class="b"></i></span></div>
+  </div>
+  <div class="h3"><span>Fan vote</span><a>Not part of SIM</a></div>
+  <div class="pub"><div class="q">Who's the bigger diver?</div><div class="sub">Vote to see the split · 3,212 votes</div><div class="btns"><div>Vellani</div><div>Lindqvist</div></div></div>
+  <div class="cta"><div class="btn p">Share beef card ↗</div><div class="btn">⇄ Swap side</div></div>
+  <div class="tabbar"><div><i></i>Today</div><div><i></i>Rankings</div><div class="on"><i></i>Compare</div><div><i></i>Awards</div><div><i></i>More</div></div>
+</div>
+</div>
+</div>
+
+<p class="label" style="text-align:center">Desktop home · 1200px wide, shrunk to fit</p>
+<div class="desk-wrap" id="dw">
+<div class="desk paper" id="desk">
+  <div class="chrome"><i></i><i></i><i></i><span>divestats.com</span></div>
+  <div class="dnav"><div><div class="wm"><span class="d">DIVE</span><span class="s">STATS</span></div><small>INSTITUTE FOR SIMULATION RESEARCH</small></div>
+    <nav><span class="on">Today</span><span>Rankings</span><span>Leagues</span><span>Compare</span><span>Awards</span><span>Vault</span><span>Methodology</span></nav>
+    <span class="sc">All leagues ▾</span><span class="sc">⌕</span></div>
+  <div class="dticker">PL 23/24: <b>177</b> / 380 MATCHES STUDIED · 1,204 CASES ON FILE · 203 MATCHES: NO FOOTAGE · NEXT CASE IN 14:22:08</div>
+  <div class="dmain">
+    <div>
+      <div class="dcase">
+        <div class="media"><div class="mode"><span>CLIP</span><span class="on">DIAGRAM</span><span>STILLS</span></div>
+          <svg viewBox="0 0 400 330" width="100%" height="100%" fill="none" stroke="#e9f2e4" stroke-width="1.6"><rect x="14" y="14" width="372" height="302"/><line x1="200" y1="14" x2="200" y2="316"/><circle cx="200" cy="165" r="40"/><rect x="306" y="90" width="80" height="150"/><rect x="352" y="130" width="34" height="70"/><path d="M140 250 C210 225 260 190 300 175" stroke="#fff" stroke-dasharray="5 5"/><circle cx="282" cy="198" r="6" fill="#9ec7ff" stroke="none"/><circle cx="300" cy="175" r="8" fill="#ff4f1f" stroke="none"/><path d="M306 178 q8 -14 16 0 q8 14 16 0 q8 -14 16 0" stroke="#ffd36b" stroke-width="2.5"/><text x="246" y="158" fill="#fff" stroke="none" font-size="12" font-family="IBM Plex Mono">CONTACT: NONE</text></svg>
+          <div class="stamp">THEATRICAL</div></div>
+        <div class="info">
+          <div class="k"><span>Today's Case #312</span><span>Fresh · 20 Nov</span></div>
+          <h2>Marco Vellani</h2><div class="cs">CASE DS-2324-0187 · Northbridge 1–1 Calder Utd · 63'</div>
+          <div class="fd">Subject remained grounded 41s after contact rated <b>none</b>. Clutched: face. Contact: shin. Miracle recovery at award of penalty.</div>
+          <div class="g4"><div class="sim"><b>94.2</b><span>SIM 🔒</span></div><div><b>41s</b><span>Grounded</span></div><div><b>3</b><span>Rolls</span></div><div><b>Pen</b><span>Payoff</span></div></div>
+          <div class="drate"><div class="q">Peer review: rate the acting</div><div class="track"><div class="knob"></div></div><div class="row2"><div class="p">Submit review · 5/10</div><div>Compare Vellani</div></div></div>
+        </div>
+      </div>
+
+      <div class="dsec"><h3><span>01</span>Scheduled hearings</h3><a>All hearings</a></div>
+      <div class="hgrid">
+        <div class="hc"><div class="k">Sat 15:00</div><div class="v"><b>Northbridge</b><span>71.4</span></div><div class="v"><b>Calder Utd</b><span>48.9</span></div><div class="m">Last 6 meetings: 14 cases to 5</div></div>
+        <div class="hc"><div class="k">Derby · Sun 16:30</div><div class="v"><b>Harrowgate</b><span>55.0</span></div><div class="v"><b>Harrow Ath.</b><span>62.3</span></div><div class="m">Open the hearing →</div></div>
+        <div class="hc"><div class="k">Big names</div><div class="v"><b>M. Vellani</b><span>100</span></div><div class="v"><b>P. Salcedo</b><span>83.0</span></div><div class="m">PL v La Liga · open →</div></div>
+      </div>
+
+      <div class="dsec"><h3><span>03</span>Double-blind trial &nbsp;·&nbsp; <span>05</span>This week in the lab</h3><a>The Canon</a></div>
+      <div class="two">
+        <div class="dtrial"><div class="q">Which is the superior performance?</div><div class="s">Hover to play · trial 3 of 5 today</div>
+          <div class="p2"><div class="c"><div class="mm"></div><div class="b"><b>Vellani, 63'</b><span>41s · 3 rolls · contact none</span></div><div class="vt">Watch to vote</div></div>
+          <div class="c"><div class="mm" style="background:#3d5a46"></div><div class="b"><b>Lindqvist, 88'</b><span>67s · 5 rolls · contact light</span></div><div class="vt">Watch to vote</div></div></div></div>
+        <div class="ddock">
+          <div class="m"><span><b>Northbridge 1–1 Calder Utd</b></span><span class="pill">6 cases</span></div>
+          <div class="m"><span><b>Harrow Ath. 2–0 Ferris Town</b></span><span class="pill">3 cases</span></div>
+          <div class="m nf"><span>Kingsmoor 0–3 Harrowgate</span><span class="pill">No footage</span></div>
+          <div class="m"><span><b>Ashby Rovers 0–0 Wexley</b></span><span class="pill">0 cases ✓</span></div>
+          <div class="m nf"><span>Daleford 2–2 Port Elm</span><span class="pill">No footage</span></div>
+          <div class="m"><span><b>Wexley 1–2 Kingsmoor</b></span><span class="pill">4 cases</span></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="rail">
+      <div class="box"><div class="bh"><span>02 · Top offenders</span><span>Week</span></div>
+        <div class="chips"><span class="on">All</span><span>PL</span><span>La Liga</span><span>Serie A</span></div>
+        <div class="r"><span class="n">1</span><div><b>M. Vellani</b><span class="t">Northbridge · ENG</span></div><i><s style="width:100%"></s></i><span class="v">94.2</span></div>
+        <div class="r"><span class="n">2</span><div><b>P. Salcedo</b><span class="t">Real Almara · ESP</span></div><i><s style="width:88%"></s></i><span class="v">83.0</span></div>
+        <div class="r"><span class="n">3</span><div><b>J. Okafor-Price</b><span class="t">Calder Utd · ENG</span></div><i><s style="width:81%"></s></i><span class="v">76.0</span></div>
+        <div class="r"><span class="n">4</span><div><b>L. Ferretti</b><span class="t">AC Varenna · ITA</span></div><i><s style="width:70%"></s></i><span class="v">66.1</span></div>
+      </div>
+      <div class="ad">Reserved · 300 × 250</div>
+      <div class="aw"><h4>Season award · standings</h4><div class="t">Simulator of the Season</div>
+        <div class="l"><b>M. Vellani</b><i style="width:100%"></i><span>412</span></div>
+        <div class="l"><b>T. Lindqvist</b><i style="width:86%"></i><span>355</span></div>
+        <div class="l"><b>J. Okafor-Price</b><i style="width:61%"></i><span>251</span></div></div>
+      <div class="box"><div class="bh"><span>04 · Which league dives most?</span></div>
+        <div class="r"><span class="n">1</span><div><b>La Liga</b></div><i><s style="width:100%"></s></i><span class="v">100</span></div>
+        <div class="r"><span class="n">2</span><div><b>Serie A</b></div><i><s style="width:91%"></s></i><span class="v">91.4</span></div>
+        <div class="r"><span class="n">3</span><div><b>Premier League</b></div><i><s style="width:63%"></s></i><span class="v">63.0</span></div>
+      </div>
+    </aside>
+  </div>
+</div>
+</div>
+<script>
+  function fit(){var w=document.getElementById('dw').clientWidth, d=document.getElementById('desk'), s=Math.min(1,w/1200);
+    d.style.transform='scale('+s+')'; document.getElementById('dw').style.height=(d.offsetHeight*s)+'px';}
+  addEventListener('resize',fit); addEventListener('load',fit); fit();
+</script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flopstats brand directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&family=Anton&family=Archivo+Narrow:wght@500;700&family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#ecebe6; --ink:#16161a; --muted:#6b6a66; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--ink); font-family:'Inter Tight',system-ui,sans-serif; padding:24px 16px 64px; }
+  header.page { max-width:1180px; margin:0 auto 20px; }
+  header.page h1 { font-size:22px; font-weight:800; letter-spacing:-.01em; }
+  header.page p { color:var(--muted); font-size:14px; margin-top:6px; max-width:760px; line-height:1.45; }
+  .row { display:flex; flex-wrap:wrap; gap:28px; justify-content:center; max-width:1180px; margin:0 auto; }
+  .col { width:360px; cursor:pointer; border-radius:22px; padding:8px; transition:outline .1s; outline:3px solid transparent; }
+  .col.selected { outline-color:#2a6df4; }
+  .col h2 { font-size:15px; font-weight:800; margin:4px 6px 2px; }
+  .col .why { font-size:12.5px; color:var(--muted); margin:0 6px 10px; line-height:1.4; min-height:52px; }
+  .phone { width:344px; border-radius:18px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.18); }
+  .swatches { display:flex; gap:6px; margin:12px 6px 0; }
+  .swatches span { flex:1; height:26px; border-radius:6px; font-size:9.5px; display:flex; align-items:flex-end; padding:3px 5px; font-family:'IBM Plex Mono',monospace; }
+  .type { margin:8px 6px 0; font-size:11.5px; color:var(--muted); }
+
+  /* ---------- A: LAB REPORT ---------- */
+  .a { background:#f4f1ea; color:#121212; font-family:'IBM Plex Sans',sans-serif;
+       background-image:linear-gradient(#e3ded2 1px,transparent 1px),linear-gradient(90deg,#e3ded2 1px,transparent 1px); background-size:16px 16px; }
+  .a .bar { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:2px solid #121212; background:#f4f1ea; }
+  .a .logo { font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:17px; letter-spacing:-.02em; }
+  .a .logo b { background:#ff4f1f; color:#fff; padding:0 4px; margin-right:2px; }
+  .a .sub { font-family:'IBM Plex Mono',monospace; font-size:8.5px; text-transform:uppercase; letter-spacing:.08em; line-height:1.25; text-align:right; }
+  .a .kicker { font-family:'IBM Plex Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.1em; padding:12px 14px 4px; display:flex; justify-content:space-between; }
+  .a .kicker .fresh { background:#121212; color:#f4f1ea; padding:1px 6px; }
+  .a .media { margin:6px 14px; border:2px solid #121212; background:#2f6b3a; position:relative; height:170px; }
+  .a .stamp { position:absolute; right:10px; bottom:12px; transform:rotate(-9deg); border:3px solid #ff4f1f; color:#ff4f1f; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px; padding:3px 8px; background:rgba(244,241,234,.92); letter-spacing:.06em; }
+  .a h3 { font-size:22px; font-weight:700; padding:8px 14px 0; line-height:1.1; }
+  .a .case { font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:#555; padding:4px 14px 0; }
+  .a .finding { margin:10px 14px; padding:9px 10px; border-left:4px solid #ff4f1f; background:#fff; font-size:12.5px; line-height:1.4; }
+  .a .finding em { font-family:'IBM Plex Mono',monospace; font-style:normal; font-size:10px; text-transform:uppercase; letter-spacing:.08em; display:block; color:#ff4f1f; margin-bottom:3px; }
+  .a .grid { display:grid; grid-template-columns:repeat(4,1fr); margin:0 14px; border:2px solid #121212; background:#fff; }
+  .a .grid div { padding:7px 6px; border-right:1px solid #121212; }
+  .a .grid div:last-child { border:0; }
+  .a .grid b { display:block; font-family:'IBM Plex Mono',monospace; font-size:18px; }
+  .a .grid span { font-size:9px; text-transform:uppercase; letter-spacing:.05em; color:#555; }
+  .a .grid .sim { background:#121212; color:#fff; } .a .grid .sim span { color:#ff9b7a; }
+  .a .rate { margin:12px 14px 16px; font-size:11px; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.06em; }
+  .a .track { height:10px; border:2px solid #121212; margin-top:6px; position:relative; background:repeating-linear-gradient(90deg,#fff 0 9.5%,#121212 9.5% 10%); }
+  .a .knob { position:absolute; left:78%; top:-7px; width:20px; height:20px; background:#ff4f1f; border:2px solid #121212; }
+  .a .cta { display:flex; gap:8px; margin:0 14px 16px; }
+  .a .cta div { flex:1; text-align:center; padding:10px; font-weight:700; font-size:13px; border:2px solid #121212; }
+  .a .cta .p { background:#ff4f1f; color:#fff; }
+
+  /* ---------- B: TABLOID INQUIRY ---------- */
+  .b { background:#0d0d0d; color:#fff; font-family:'Archivo Narrow',sans-serif; }
+  .b .bar { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#e8ff3a; color:#0d0d0d; }
+  .b .logo { font-family:'Anton',sans-serif; font-size:26px; letter-spacing:.01em; text-transform:uppercase; line-height:1; }
+  .b .sub { font-size:9.5px; font-weight:700; text-transform:uppercase; text-align:right; line-height:1.15; }
+  .b .kicker { display:flex; gap:6px; padding:12px 14px 0; font-weight:700; font-size:11px; text-transform:uppercase; }
+  .b .kicker span { background:#ff2d55; padding:2px 7px; } .b .kicker span+span { background:#fff; color:#0d0d0d; }
+  .b h3 { font-family:'Anton',sans-serif; font-size:40px; line-height:.95; text-transform:uppercase; padding:8px 14px 0; }
+  .b h3 i { font-style:normal; color:#e8ff3a; }
+  .b .media { margin:10px 14px; height:160px; position:relative; background:#2f6b3a;
+              filter:contrast(1.1); }
+  .b .media::after { content:''; position:absolute; inset:0; background:radial-gradient(#000 1px,transparent 1.4px) 0 0/5px 5px; opacity:.35; }
+  .b .big { position:absolute; left:10px; bottom:6px; z-index:2; font-family:'Anton'; font-size:64px; line-height:1; color:#e8ff3a; text-shadow:3px 3px 0 #0d0d0d; }
+  .b .big small { font-size:16px; display:block; color:#fff; text-shadow:none; background:#0d0d0d; padding:1px 4px; width:max-content; }
+  .b .chips { display:flex; flex-wrap:wrap; gap:6px; padding:0 14px; }
+  .b .chips div { border:2px solid #fff; padding:4px 8px; font-weight:700; font-size:12.5px; text-transform:uppercase; }
+  .b .chips div b { color:#e8ff3a; }
+  .b .quote { padding:12px 14px 0; font-size:14px; line-height:1.35; color:#ddd; }
+  .b .rate { margin:14px; font-weight:700; text-transform:uppercase; font-size:12px; }
+  .b .emojis { display:flex; justify-content:space-between; font-size:22px; margin-top:6px; background:#222; padding:6px 10px; border-radius:40px; }
+  .b .cta { margin:0 14px 16px; background:#ff2d55; text-align:center; padding:12px; font-family:'Anton'; font-size:18px; text-transform:uppercase; letter-spacing:.03em; }
+
+  /* ---------- C: THE INSTITUTE (journal + pitch green) ---------- */
+  .c { background:#0f2a1f; color:#f3efe3; font-family:'Inter Tight',sans-serif; }
+  .c .bar { display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid rgba(243,239,227,.2); }
+  .c .seal { width:34px; height:34px; border-radius:50%; border:1.5px solid #d8b45a; display:flex; align-items:center; justify-content:center; font-family:'Instrument Serif'; font-size:17px; color:#d8b45a; font-style:italic; }
+  .c .logo { font-family:'Instrument Serif',serif; font-size:24px; line-height:1; }
+  .c .sub { font-size:8.5px; letter-spacing:.14em; text-transform:uppercase; color:#d8b45a; margin-top:2px; }
+  .c .kicker { display:flex; justify-content:space-between; padding:14px 14px 0; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#b9c4b8; }
+  .c .kicker b { color:#d8b45a; font-weight:600; }
+  .c h3 { font-family:'Instrument Serif',serif; font-weight:400; font-size:34px; line-height:1.02; padding:6px 14px 0; }
+  .c h3 i { color:#d8b45a; }
+  .c .media { margin:12px 14px; height:160px; border-radius:10px; background:#1d4d36; position:relative; overflow:hidden; }
+  .c .abstract { padding:0 14px; font-size:13px; line-height:1.45; color:#d6dccf; }
+  .c .abstract b { font-family:'Instrument Serif'; font-style:italic; font-weight:400; font-size:15px; color:#f3efe3; }
+  .c .stats { display:flex; margin:14px; border-top:1px solid rgba(243,239,227,.25); border-bottom:1px solid rgba(243,239,227,.25); }
+  .c .stats div { flex:1; padding:9px 4px; text-align:center; }
+  .c .stats b { display:block; font-family:'Instrument Serif'; font-size:26px; font-weight:400; }
+  .c .stats .sim b { color:#d8b45a; }
+  .c .stats span { font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:#b9c4b8; }
+  .c .rate { margin:0 14px 14px; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#b9c4b8; }
+  .c .track { height:4px; background:rgba(243,239,227,.25); border-radius:4px; margin-top:12px; position:relative; }
+  .c .track::before { content:''; position:absolute; left:0; width:78%; height:4px; background:#d8b45a; border-radius:4px; }
+  .c .knob { position:absolute; left:calc(78% - 9px); top:-7px; width:18px; height:18px; border-radius:50%; background:#f3efe3; box-shadow:0 0 0 4px rgba(216,180,90,.35); }
+  .c .cta { margin:0 14px 16px; border:1px solid #d8b45a; color:#d8b45a; border-radius:40px; text-align:center; padding:10px; font-size:13px; font-weight:600; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Three brand directions for Flopstats · Institute of Flopology</h1>
+  <p>Each phone shows the same Flop of the Day with mock data, so you're comparing the look and voice, not the content. The pitch diagram stands in for the clip, which is also our fallback if footage can't be shown. Click one to select it, or tell me what to mix.</p>
+</header>
+
+<div class="row">
+
+<!-- A -->
+<div class="col" data-choice="a-lab-report" onclick="toggleSelect(this)">
+  <h2>A · Lab Report</h2>
+  <p class="why">Deadpan research institute, taken literally: graph paper, monospace, hazard orange, rubber stamps. The most "credible", and the case-file feel is built in.</p>
+  <div class="phone a">
+    <div class="bar"><div class="logo"><b>F</b>FLOPSTATS</div><div class="sub">Institute of<br>Flopology</div></div>
+    <div class="kicker"><span>Flop of the Day · 20.11</span><span class="fresh">FRESH</span></div>
+    <div class="media">
+      <svg viewBox="0 0 300 166" width="100%" height="100%" fill="none" stroke="#e9f2e4" stroke-width="1.4"><rect x="8" y="8" width="284" height="150"/><line x1="150" y1="8" x2="150" y2="158"/><circle cx="150" cy="83" r="22"/><rect x="232" y="45" width="60" height="76"/><rect x="268" y="65" width="24" height="36"/><path d="M120 120 C160 110 190 95 222 88" stroke="#fff" stroke-dasharray="4 4"/><circle cx="222" cy="88" r="5" fill="#ff4f1f" stroke="none"/><path d="M226 90 q6 -10 12 0 q6 10 12 0 q6 -10 12 0" stroke="#ffd36b" stroke-width="2"/><text x="214" y="76" fill="#fff" stroke="none" font-size="9" font-family="IBM Plex Mono">CONTACT: NONE</text></svg>
+      <div class="stamp">THEATRICAL</div>
+    </div>
+    <h3>Marco Vellani</h3>
+    <div class="case">CASE FS-2324-0187 · Northbridge v Calder Utd · 63'</div>
+    <div class="finding"><em>Finding</em>Subject remained grounded 41s after contact rated <b>none</b>. Miracle recovery observed at award of free kick.</div>
+    <div class="grid"><div class="sim"><b>94.2</b><span>SIM</span></div><div><b>41s</b><span>Grounded</span></div><div><b>3</b><span>Rolls</span></div><div><b>9/10</b><span>Pain</span></div></div>
+    <div class="rate">Rate the acting · 8.1
+      <div class="track"><div class="knob"></div></div></div>
+    <div class="cta"><div class="p">Share receipt</div><div>Compare</div></div>
+  </div>
+  <div class="swatches"><span style="background:#f4f1ea;border:1px solid #ccc">paper</span><span style="background:#121212;color:#fff">ink</span><span style="background:#ff4f1f;color:#fff">hazard</span><span style="background:#2f6b3a;color:#fff">pitch</span></div>
+  <p class="type">IBM Plex Mono + IBM Plex Sans</p>
+</div>
+
+<!-- B -->
+<div class="col" data-choice="b-tabloid" onclick="toggleSelect(this)">
+  <h2>B · Tabloid Inquiry</h2>
+  <p class="why">Loud back-page energy: acid yellow, condensed caps, halftone. Built for the X timeline and TikTok thumbnails. Funniest at a glance, but the "institute" sits underneath it.</p>
+  <div class="phone b">
+    <div class="bar"><div class="logo">Flopstats</div><div class="sub">Institute of<br>Flopology</div></div>
+    <div class="kicker"><span>Flop of the day</span><span>Fresh</span></div>
+    <h3>Vellani goes <i>down</i> like a sack of spuds</h3>
+    <div class="media">
+      <svg viewBox="0 0 300 160" width="100%" height="100%" fill="none" stroke="#e9f2e4" stroke-width="1.4"><rect x="8" y="8" width="284" height="144"/><line x1="150" y1="8" x2="150" y2="152"/><circle cx="150" cy="80" r="22"/><rect x="232" y="42" width="60" height="76"/><path d="M120 115 C160 105 190 92 222 85" stroke="#fff" stroke-dasharray="4 4"/><circle cx="222" cy="85" r="5" fill="#ff2d55" stroke="none"/></svg>
+      <div class="big"><small>SIM RATING</small>94.2</div>
+    </div>
+    <div class="chips"><div><b>41s</b> on the deck</div><div><b>3</b> rolls</div><div>Contact: <b>none</b></div><div>Pain <b>9/10</b></div></div>
+    <p class="quote">Clutched his face. Was touched on the shin. Was up before the wall was set.</p>
+    <div class="rate">Rate the acting
+      <div class="emojis"><span>😐</span><span>😬</span><span>😩</span><span>😭</span><span>🎭</span></div></div>
+    <div class="cta">Send the receipts</div>
+  </div>
+  <div class="swatches"><span style="background:#0d0d0d;color:#fff">black</span><span style="background:#e8ff3a">acid</span><span style="background:#ff2d55;color:#fff">siren</span><span style="background:#fff;border:1px solid #ccc">white</span></div>
+  <p class="type">Anton + Archivo Narrow</p>
+</div>
+
+<!-- C -->
+<div class="col" data-choice="c-institute" onclick="toggleSelect(this)">
+  <h2>C · The Institute</h2>
+  <p class="why">A posh academic journal in pitch green and gold: serif display, a seal, "abstracts". The joke is the prestige. Gold carries straight into awards glitz.</p>
+  <div class="phone c">
+    <div class="bar"><div class="seal">F</div><div><div class="logo">Flopstats</div><div class="sub">Institute of Flopology</div></div></div>
+    <div class="kicker"><span>Flop of the Day</span><b>Fresh · 20 Nov</b></div>
+    <h3>Marco Vellani, <i>a study in collapse</i></h3>
+    <div class="media">
+      <svg viewBox="0 0 300 160" width="100%" height="100%" fill="none" stroke="rgba(243,239,227,.55)" stroke-width="1.2"><rect x="8" y="8" width="284" height="144" rx="4"/><line x1="150" y1="8" x2="150" y2="152"/><circle cx="150" cy="80" r="22"/><rect x="232" y="42" width="60" height="76"/><path d="M120 115 C160 105 190 92 222 85" stroke="#f3efe3" stroke-dasharray="3 4"/><circle cx="222" cy="85" r="10" fill="none" stroke="#d8b45a" stroke-width="2"/><circle cx="222" cy="85" r="3" fill="#d8b45a" stroke="none"/></svg>
+    </div>
+    <p class="abstract"><b>Abstract.</b> Subject remained grounded 41 seconds following contact rated <i>none</i>, before a miracle recovery at the award of a free kick.</p>
+    <div class="stats"><div class="sim"><b>94.2</b><span>SIM</span></div><div><b>41s</b><span>Grounded</span></div><div><b>3</b><span>Rolls</span></div><div><b>9</b><span>Pain</span></div></div>
+    <div class="rate">Peer review · rate the acting · 8.1
+      <div class="track"><div class="knob"></div></div></div>
+    <div class="cta">Cite this flop ↗</div>
+  </div>
+  <div class="swatches"><span style="background:#0f2a1f;color:#fff">pitch</span><span style="background:#f3efe3;border:1px solid #ccc">chalk</span><span style="background:#d8b45a">gold</span><span style="background:#1d4d36;color:#fff">turf</span></div>
+  <p class="type">Instrument Serif + Inter Tight</p>
+</div>
+
+</div>
+</body>
+</html>
