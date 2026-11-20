@@ -119,3 +119,38 @@ def test_prohibited_content_is_a_content_block(segment):
     respx.post(DECISIONS_URL).respond(400, json={"error": {"code": "prohibited_content", "message": "Input blocked"}})
     with pytest.raises(ContentBlocked):
         DecisionScorer(KEY).score(segment)
+
+
+def _gen_clock(answer: dict, prompt_tokens=1200, out_tokens=20):
+    return httpx.Response(200, json={
+        "candidates": [{"content": {"parts": [{"text": json.dumps(answer)}]}}],
+        "usageMetadata": {"promptTokenCount": prompt_tokens, "candidatesTokenCount": out_tokens}})
+
+
+@respx.mock
+def test_gemini_clock_reader_reads_the_clock_as_text(tmp_path):
+    # Pilot: the Decisions API misread the minute on 8 of 12 Chelsea-City second-half frames;
+    # Gemini Flash reading the scoreboard as text got 22 of 23 within 3 s.
+    from flopstats.detect.gemini import GeminiClockReader, generate_url
+    png = tmp_path / "f.png"
+    png.write_bytes(b"\x89PNG fake")
+    route = respx.post(generate_url("gemini-3.8-flash")).mock(
+        return_value=_gen_clock({"visible": True, "minute": 51, "second": 52}))
+    reader = GeminiClockReader(KEY, "gemini-3.8-flash", usd_per_m_input=Decimal("0.75"), usd_per_m_output=Decimal("3.75"))
+    r = reader.read(png)
+    assert (r.minute, r.second) == (51, 52) and r.confidence == 1.0
+    assert reader.spent_usd == (Decimal(1200) * Decimal("0.75") + Decimal(20) * Decimal("3.75")) / Decimal(1_000_000)
+    body = json.loads(route.calls[0].request.content)
+    assert body["contents"][0]["parts"][0]["inline_data"]["mime_type"] == "image/png"
+    assert body["generationConfig"]["responseMimeType"] == "application/json"
+
+
+@respx.mock
+def test_gemini_clock_reader_no_clock_or_garbage(tmp_path):
+    from flopstats.detect.gemini import GeminiClockReader, generate_url
+    png = tmp_path / "f.png"
+    png.write_bytes(b"\x89PNG fake")
+    reader = GeminiClockReader(KEY, "gemini-3.8-flash", usd_per_m_input=Decimal("0.75"), usd_per_m_output=Decimal("3.75"))
+    for answer in ({"visible": False}, {"visible": True, "minute": 51}, {"visible": True, "minute": 51, "second": 75}):
+        respx.post(generate_url("gemini-3.8-flash")).mock(return_value=_gen_clock(answer))
+        assert reader.read(png) is None

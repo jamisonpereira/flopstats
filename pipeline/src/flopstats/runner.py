@@ -61,6 +61,8 @@ class RunConfig(BaseModel):
     prices: dict[str, dict[str, float]] = Field(default_factory=dict)
     # Model calls (window scoring, verification) made at the same time. Writes stay one at a time.
     workers: int = Field(default=8, ge=1)
+    # Reads the broadcast clock for time sync (needs an entry in prices).
+    clock_model: str = "gemini-3.8-flash"
 
 
 @dataclass

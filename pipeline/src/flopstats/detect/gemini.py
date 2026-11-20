@@ -200,6 +200,49 @@ def generate_url(model: str) -> str:
     return f"{GENERATE_BASE}/{model}:generateContent"
 
 
+class GeminiClockReader:
+    """Reads the broadcast clock as text with a Gemini model (generateContent, structured JSON).
+    Far more accurate than DecisionClockReader's minute/second menus (pilot: 22/23 vs 4/12 frames)."""
+
+    PROMPT = ("This is a frame from a football broadcast. Read the match clock in the on-screen scoreboard "
+              "(e.g. 51:52 means minute 51, second 52). Ignore any added-time indicator such as +3. "
+              "If no running match clock is visible (replay, graphic, close-up, half-time), set visible to false.")
+    SCHEMA = {"type": "object", "properties": {"visible": {"type": "boolean"}, "minute": {"type": "integer"},
+                                               "second": {"type": "integer"}}, "required": ["visible"]}
+
+    def __init__(self, api_key: str, model: str, *, usd_per_m_input: Decimal, usd_per_m_output: Decimal,
+                 http: httpx.Client | None = None, sleep: Callable[[float], None] = time.sleep):
+        self.name = model
+        self._key = api_key
+        self._in, self._out = Decimal(usd_per_m_input), Decimal(usd_per_m_output)
+        self._http = http or httpx.Client(timeout=120.0)
+        self._sleep = sleep
+        self.spent_usd = Decimal(0)
+
+    def read(self, png: Path) -> ClockReading | None:
+        import json
+
+        body = {
+            "contents": [{"role": "user", "parts": [
+                {"inline_data": {"mime_type": "image/png", "data": base64.b64encode(Path(png).read_bytes()).decode()}},
+                {"text": self.PROMPT},
+            ]}],
+            "generationConfig": {"responseMimeType": "application/json", "responseJsonSchema": self.SCHEMA, "temperature": 0},
+        }
+        data = post_json(self._http, generate_url(self.name), body, self._key, self._sleep)
+        u = data.get("usageMetadata", {})
+        out_tokens = (u.get("candidatesTokenCount") or 0) + (u.get("thoughtsTokenCount") or 0)
+        self.spent_usd += (Decimal(u.get("promptTokenCount") or 0) * self._in + Decimal(out_tokens) * self._out) / Decimal(1_000_000)
+        try:
+            a = json.loads(data["candidates"][0]["content"]["parts"][0]["text"])
+            minute, second = int(a["minute"]), int(a["second"])
+        except (KeyError, IndexError, TypeError, ValueError):
+            return None
+        if not a.get("visible") or not (0 <= minute <= 130 and 0 <= second <= 59):
+            return None
+        return ClockReading(minute=minute, second=second, confidence=1.0)
+
+
 class InvalidModelOutput(Exception):
     def __init__(self, message: str, usd: Decimal):
         super().__init__(message)

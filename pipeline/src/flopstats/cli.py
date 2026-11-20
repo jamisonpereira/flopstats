@@ -131,7 +131,7 @@ def _build_deps(settings, cfg):
     from pathlib import Path
 
     from flopstats import runner
-    from flopstats.detect.gemini import DecisionClockReader, DecisionScorer, GeminiVerifier
+    from flopstats.detect.gemini import DecisionScorer, GeminiClockReader, GeminiVerifier
     from flopstats.footballia import download
     from flopstats.storage import SupabaseStorage, get_storage
     from flopstats.video import ffmpeg
@@ -148,6 +148,11 @@ def _build_deps(settings, cfg):
             raise typer.BadParameter(f"config.prices has no entry for {model!r}")
         verifiers.append(GeminiVerifier(key, model, usd_per_m_input=price["input"], usd_per_m_output=price["output"],
                                         prompt_version=cfg.prompt_versions.get("verify", "v1")))
+    clock_price = cfg.prices.get(cfg.clock_model)
+    if not clock_price:
+        raise typer.BadParameter(f"config.prices has no entry for clock_model {cfg.clock_model!r}")
+    clock_reader = GeminiClockReader(key, cfg.clock_model, usd_per_m_input=clock_price["input"],
+                                     usd_per_m_output=clock_price["output"])
     storage = get_storage(settings)
     if isinstance(storage, SupabaseStorage):
         storage.ensure_bucket()
@@ -160,7 +165,7 @@ def _build_deps(settings, cfg):
         return download.fetch_match(url, dest, client=session["client"])
 
     return runner.Deps(storage=storage, scorer=DecisionScorer(key, cfg.scorer_model), verifiers=verifiers,
-                       clock_reader=DecisionClockReader(key), download=fetch, entry_for=runner.entry_from_listing,
+                       clock_reader=clock_reader, download=fetch, entry_for=runner.entry_from_listing,
                        probe_duration=ffmpeg.probe_duration, cut=ffmpeg.cut, frame_at=ffmpeg.frame_at,
                        workdir=Path("data/work"), settings=settings)
 

@@ -63,3 +63,17 @@ def test_run_season_stops_on_budget(db, settings, monkeypatch):
     monkeypatch.setattr(runner, "process_match", lambda conn, run, url, deps: done.append(url) or runner.MatchReport("blocked_budget"))
     r = CliRunner().invoke(cli.app, ["run", "season", "--run", str(run_id), "--league", "39", "--season", "2024"])
     assert r.exit_code == 0 and len(done) == 1 and "budget" in r.output
+
+
+def test_build_deps_reads_the_clock_with_the_configured_gemini_model(tmp_path, monkeypatch):
+    from pydantic import SecretStr
+
+    from flopstats import runner
+    from flopstats.config import Settings
+    from flopstats.detect.gemini import GeminiClockReader
+
+    monkeypatch.chdir(tmp_path)
+    settings = Settings(_env_file=None, gemini_key=SecretStr("k"), storage_backend="local", storage_local_root=str(tmp_path))
+    cfg = runner.RunConfig(**CFG)
+    deps = cli._build_deps(settings, cfg)
+    assert isinstance(deps.clock_reader, GeminiClockReader) and deps.clock_reader.name == "gemini-3.8-flash"
