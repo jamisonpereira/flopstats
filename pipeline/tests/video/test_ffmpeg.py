@@ -9,6 +9,20 @@ from flopstats.video import ffmpeg
 TINY = Path(__file__).resolve().parents[1] / "fixtures" / "video" / "tiny.mp4"
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _tiny_video():
+    """A 60 s 160x90 test clip with audio. *.mp4 is git-ignored, so a fresh clone builds it here."""
+    if not TINY.exists():
+        TINY.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y",
+             "-f", "lavfi", "-i", "testsrc=size=160x90:rate=10:duration=60",
+             "-f", "lavfi", "-i", "sine=frequency=440:duration=60",
+             "-c:v", "libx264", "-g", "10", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(TINY)],
+            check=True,
+        )
+
+
 def _streams(path):
     out = subprocess.run(["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(path)],
                          check=True, capture_output=True, text=True).stdout
