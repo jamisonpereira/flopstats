@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flopstats home v1</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4f1ea; --grid:#e3ded2; --ink:#121212; --muted:#5d5a54; --card:#fff;
+    --hazard:#ff4f1f; --hazard-soft:#ffe1d6; --pitch:#2f6b3a; --nofoot:#b9b4a8;
+    --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#d9d6cf;font-family:var(--sans);color:var(--ink);padding:20px 12px 60px}
+  .intro{max-width:820px;margin:0 auto 18px;font-size:14px;line-height:1.45;color:#3a3833}
+  .intro h1{font-size:20px;margin-bottom:6px}
+  .row{display:flex;flex-wrap:wrap;gap:26px;justify-content:center;align-items:flex-start}
+  .label{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:#55524b;margin:0 0 8px 4px}
+  .phone{width:375px;border-radius:20px;overflow:hidden;box-shadow:0 12px 34px rgba(0,0,0,.2);
+    background:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:16px 16px;position:relative}
+  .mono{font-family:var(--mono)}
+  .up{text-transform:uppercase;letter-spacing:.08em}
+  /* top */
+  .bar{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:2px solid var(--ink);background:var(--paper);position:sticky;top:0}
+  .logo{font:600 17px var(--mono);letter-spacing:-.02em}.logo b{background:var(--hazard);color:#fff;padding:0 4px;margin-right:2px}
+  .bar .r{display:flex;gap:10px;align-items:center;font:600 10px var(--mono)}
+  .burger{width:22px;height:14px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);position:relative}.burger::after{content:'';position:absolute;left:0;right:0;top:4px;border-top:2px solid var(--ink)}
+  .ticker{background:var(--ink);color:var(--paper);font:500 10px var(--mono);padding:6px 14px;white-space:nowrap;overflow:hidden;letter-spacing:.04em}
+  .ticker b{color:var(--hazard)}
+  /* section heads */
+  .sh{display:flex;justify-content:space-between;align-items:baseline;padding:18px 14px 8px}
+  .sh h2{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.1em}
+  .sh h2 span{background:var(--ink);color:var(--paper);padding:2px 6px;margin-right:6px}
+  .sh a{font:500 10.5px var(--mono);color:var(--muted);text-decoration:underline}
+  /* FOTD */
+  .fotd-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px;font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.1em}
+  .tag{padding:2px 6px;border:1.5px solid var(--ink)}.tag.fresh{background:var(--ink);color:var(--paper)}
+  .media{margin:6px 14px;border:2px solid var(--ink);background:var(--pitch);position:relative;height:190px}
+  .media .mode{position:absolute;left:8px;top:8px;display:flex;gap:4px}
+  .media .mode span{font:600 9px var(--mono);background:rgba(244,241,234,.92);padding:2px 6px;border:1px solid var(--ink)}
+  .media .mode span.on{background:var(--ink);color:var(--paper)}
+  .media .play{position:absolute;right:8px;top:8px;font:600 9px var(--mono);color:#fff;opacity:.85}
+  .stamp{position:absolute;right:10px;bottom:12px;transform:rotate(-9deg);border:3px solid var(--hazard);color:var(--hazard);font:600 14px var(--mono);padding:3px 8px;background:rgba(244,241,234,.93);letter-spacing:.06em}
+  .who{padding:10px 14px 0;display:flex;gap:10px;align-items:center}
+  .avatar{width:42px;height:42px;border:2px solid var(--ink);background:#cfc9bb;display:flex;align-items:center;justify-content:center;font:600 13px var(--mono)}
+  .who h3{font-size:22px;line-height:1.05}
+  .who .case{font:400 10.5px var(--mono);color:var(--muted);margin-top:2px}
+  .finding{margin:10px 14px;padding:9px 10px;border-left:4px solid var(--hazard);background:var(--card);font-size:13px;line-height:1.4}
+  .finding em{font:600 10px var(--mono);font-style:normal;text-transform:uppercase;letter-spacing:.08em;display:block;color:var(--hazard);margin-bottom:3px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);margin:0 14px;border:2px solid var(--ink);background:var(--card)}
+  .grid4 div{padding:7px 6px;border-right:1px solid var(--ink)}.grid4 div:last-child{border:0}
+  .grid4 b{display:block;font:600 18px var(--mono)}.grid4 span{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .grid4 .sim{background:var(--ink);color:#fff}.grid4 .sim span{color:#ff9b7a}
+  .rate{margin:12px 14px 0;padding:10px;border:2px dashed var(--ink);background:var(--card)}
+  .rate .q{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;display:flex;justify-content:space-between}
+  .track{height:12px;border:2px solid var(--ink);margin:12px 0 6px;position:relative;background:repeating-linear-gradient(90deg,#fff 0 9.5%,var(--ink) 9.5% 10%)}
+  .knob{position:absolute;left:44%;top:-8px;width:22px;height:22px;background:var(--hazard);border:2px solid var(--ink)}
+  .scale{display:flex;justify-content:space-between;font:400 9px var(--mono);color:var(--muted)}
+  .rate .hint{font-size:11px;color:var(--muted);margin-top:6px}
+  .cta{display:flex;gap:8px;margin:12px 14px 0}
+  .btn{flex:1;text-align:center;padding:11px 6px;font-weight:700;font-size:13px;border:2px solid var(--ink);background:var(--card)}
+  .btn.p{background:var(--hazard);color:#fff}
+  .streak{margin:10px 14px 0;font:500 10.5px var(--mono);color:var(--muted);display:flex;justify-content:space-between}
+  /* hearings */
+  .rail{display:flex;gap:10px;overflow-x:auto;padding:0 14px 4px;scrollbar-width:none}
+  .hear{min-width:250px;background:var(--card);border:2px solid var(--ink);padding:10px}
+  .hear .k{font:600 9.5px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--hazard)}
+  .hear .vs{display:flex;align-items:center;justify-content:space-between;margin:8px 0}
+  .hear .side{text-align:center;width:42%}
+  .hear .side .crest{width:30px;height:30px;margin:0 auto 4px;border:2px solid var(--ink);border-radius:50%}
+  .hear .side b{display:block;font-size:13px}.hear .side span{font:600 18px var(--mono)}
+  .hear .x{font:600 11px var(--mono)}
+  .hear .meta{font:400 10px var(--mono);color:var(--muted);border-top:1px solid var(--grid);padding-top:6px}
+  /* leaderboard */
+  .lb{margin:0 14px;background:var(--card);border:2px solid var(--ink)}
+  .lb .r{display:grid;grid-template-columns:22px 1fr 100px 40px;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--grid)}
+  .lb .r:last-child{border:0}
+  .lb .n{font:600 12px var(--mono)} .lb .nm b{font-size:13.5px;display:block}.lb .nm span{font:400 10px var(--mono);color:var(--muted)}
+  .lb .barw{height:8px;background:var(--grid)}.lb .barw i{display:block;height:8px;background:var(--ink)}
+  .lb .r:first-child .barw i{background:var(--hazard)}
+  .lb .v{font:600 13px var(--mono);text-align:right}
+  .toggle{display:flex;margin:0 14px 8px;border:2px solid var(--ink);width:max-content}
+  .toggle span{font:600 10px var(--mono);padding:4px 8px;text-transform:uppercase}.toggle span.on{background:var(--ink);color:var(--paper)}
+  /* docket / coverage */
+  .docket{margin:0 14px;background:var(--card);border:2px solid var(--ink);font:400 11px var(--mono)}
+  .docket .m{display:grid;grid-template-columns:1fr auto;padding:7px 10px;border-bottom:1px solid var(--grid)}
+  .docket .m:last-child{border:0}
+  .docket .m.nf{color:var(--nofoot);background:repeating-linear-gradient(135deg,#fff 0 6px,#f3f1ec 6px 12px)}
+  .docket .m b{font-weight:600}
+  .docket .pill{font-weight:600;font-size:9.5px;padding:1px 6px;border:1.5px solid currentColor}
+  .cov{margin:8px 14px 0;font:400 10px var(--mono);color:var(--muted)}
+  .covbar{display:flex;height:8px;margin-top:4px;border:1.5px solid var(--ink)}
+  .covbar i{background:var(--ink)}.covbar s{flex:1;background:repeating-linear-gradient(135deg,#fff 0 3px,#d8d3c7 3px 6px)}
+  /* awards */
+  .awards{margin:0 14px;padding:12px;background:#121212;color:#f4f1ea;border:2px solid var(--ink);position:relative;overflow:hidden}
+  .awards::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 80% -20%,rgba(216,180,90,.35),transparent 60%)}
+  .awards h4{font:600 10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#d8b45a;position:relative}
+  .awards .t{font-size:19px;font-weight:700;margin:4px 0 10px;position:relative}
+  .race{position:relative}
+  .race .l{display:grid;grid-template-columns:96px 1fr 34px;gap:8px;align-items:center;font-size:11.5px;margin:6px 0}
+  .race .l i{display:block;height:10px;background:#d8b45a}
+  .race .l span{font:600 11px var(--mono);text-align:right}
+  /* h2h */
+  .h2h{margin:0 14px;border:2px solid var(--ink);background:var(--hazard-soft);padding:12px}
+  .h2h .q{font-weight:700;font-size:16px;text-align:center}
+  .h2h .pair{display:flex;gap:8px;margin-top:10px}
+  .h2h .pick{flex:1;background:var(--card);border:2px solid var(--ink);padding:10px 6px;text-align:center}
+  .h2h .pick .ph{width:54px;height:54px;margin:0 auto 6px;background:#cfc9bb;border:2px solid var(--ink)}
+  .h2h .pick b{font-size:13px;display:block}.h2h .pick span{font:400 10px var(--mono);color:var(--muted)}
+  .h2h .or{align-self:center;font:600 11px var(--mono)}
+  .h2h .sub{font:400 10px var(--mono);color:var(--muted);text-align:center;margin-top:8px}
+  /* reserved */
+  .ad{margin:18px 14px 0;height:90px;border:1.5px dashed var(--nofoot);display:flex;align-items:center;justify-content:center;font:400 10px var(--mono);color:var(--nofoot);text-transform:uppercase;letter-spacing:.1em}
+  .news{margin:18px 14px 0;border:2px solid var(--ink);background:var(--card);padding:12px}
+  .news b{font-size:15px}.news p{font-size:12px;color:var(--muted);margin:4px 0 8px}
+  .news .in{display:flex;border:2px solid var(--ink)}.news .in span{flex:1;padding:8px;font:400 11px var(--mono);color:var(--muted)}.news .in i{font-style:normal;background:var(--ink);color:#fff;padding:8px 10px;font:600 11px var(--mono)}
+  .foot{margin-top:18px;padding:14px;border-top:2px solid var(--ink);font:400 10px var(--mono);color:var(--muted);line-height:1.6;background:var(--paper)}
+  .tabbar{position:sticky;bottom:0;display:grid;grid-template-columns:repeat(5,1fr);border-top:2px solid var(--ink);background:var(--paper)}
+  .tabbar div{text-align:center;padding:8px 0 10px;font:600 9px var(--mono);text-transform:uppercase;letter-spacing:.04em}
+  .tabbar div i{display:block;width:18px;height:18px;margin:0 auto 3px;border:2px solid var(--ink)}
+  .tabbar .on{color:var(--hazard)}.tabbar .on i{background:var(--hazard)}
+  .note{max-width:375px;font-size:12px;color:#3a3833;line-height:1.45;margin-top:10px}
+  .note b{font-family:var(--mono);font-size:11px}
+</style>
+</head>
+<body>
+<div class="intro">
+  <h1>Home, mobile: first pass in the Lab Report style</h1>
+  Read top to bottom: the left phone is the first screen and a bit, the right phone is the rest of the scroll. All names, clubs and data are invented.
+</div>
+<div class="row">
+
+<div>
+<p class="label">Above the fold</p>
+<div class="phone">
+  <div class="bar"><div class="logo"><b>F</b>FLOPSTATS</div><div class="r"><span>EPL 23/24 ▾</span><div class="burger"></div></div></div>
+  <div class="ticker">STUDIED <b>177</b> / 380 MATCHES · 1,204 FLOPS ON FILE · 203 MATCHES: NO FOOTAGE · STUDIED</div>
+
+  <div class="fotd-head"><span>Flop of the Day <span class="mono">#312</span></span><span class="tag fresh">Fresh · 20 Nov</span></div>
+  <div class="media">
+    <div class="mode"><span>CLIP</span><span class="on">DIAGRAM</span><span>STILLS</span></div>
+    <svg viewBox="0 0 300 186" width="100%" height="100%" fill="none" stroke="#e9f2e4" stroke-width="1.4"><rect x="8" y="8" width="284" height="170"/><line x1="150" y1="8" x2="150" y2="178"/><circle cx="150" cy="93" r="24"/><rect x="232" y="50" width="60" height="86"/><rect x="268" y="72" width="24" height="42"/><path d="M110 140 C155 125 192 105 222 98" stroke="#fff" stroke-dasharray="4 4"/><circle cx="208" cy="112" r="4" fill="#9ec7ff" stroke="none"/><circle cx="222" cy="98" r="5" fill="#ff4f1f" stroke="none"/><path d="M226 100 q6 -10 12 0 q6 10 12 0 q6 -10 12 0" stroke="#ffd36b" stroke-width="2"/><text x="186" y="86" fill="#fff" stroke="none" font-size="9" font-family="IBM Plex Mono">CONTACT: NONE</text><text x="226" y="122" fill="#ffd36b" stroke="none" font-size="9" font-family="IBM Plex Mono">3 ROLLS</text></svg>
+    <div class="stamp">THEATRICAL</div>
+  </div>
+  <div class="who"><div class="avatar">MV</div><div><h3>Marco Vellani</h3><div class="case">CASE FS-2324-0187 · Northbridge 1–1 Calder Utd · 63'</div></div></div>
+  <div class="finding"><em>Finding</em>Subject remained grounded 41s after contact rated <b>none</b>. Clutched: face. Contact: shin. Miracle recovery at award of free kick.</div>
+  <div class="grid4"><div class="sim"><b>94.2</b><span>SIM</span></div><div><b>41s</b><span>Grounded</span></div><div><b>3</b><span>Rolls</span></div><div><b>Pen</b><span>Payoff</span></div></div>
+  <div class="rate">
+    <div class="q"><span>Your peer review: rate the acting</span><span>?</span></div>
+    <div class="track"><div class="knob"></div></div>
+    <div class="scale"><span>1 · Wooden</span><span>5</span><span>10 · Oscar</span></div>
+    <div class="hint">Lock in your score to see the Institute's (9/10) and the crowd's.</div>
+  </div>
+  <div class="cta"><div class="btn p">Share receipt ↗</div><div class="btn">Compare Vellani</div></div>
+  <div class="streak"><span>◷ Next flop in 14:22:08</span><span>Your streak: 6 days</span></div>
+
+  <div class="sh"><h2><span>01</span>Scheduled hearings</h2><a>All</a></div>
+  <div class="rail">
+    <div class="hear"><div class="k">This weekend · Sat 15:00</div>
+      <div class="vs"><div class="side"><div class="crest"></div><b>Northbridge</b><span>71.4</span></div><div class="x">VS</div><div class="side"><div class="crest" style="background:#121212"></div><b>Calder Utd</b><span>48.9</span></div></div>
+      <div class="meta">Last 6 meetings: 14 flops to 5 · Open the hearing →</div></div>
+    <div class="hear"><div class="k">Derby · Sun 16:30</div>
+      <div class="vs"><div class="side"><div class="crest"></div><b>Harrowgate</b><span>55.0</span></div><div class="x">VS</div><div class="side"><div class="crest"></div><b>Harrow Ath.</b><span>62.3</span></div></div>
+      <div class="meta">Open the hearing →</div></div>
+  </div>
+  <div class="tabbar"><div class="on"><i></i>Today</div><div><i></i>Rankings</div><div><i></i>Compare</div><div><i></i>Awards</div><div><i></i>More</div></div>
+</div>
+</div>
+
+<div>
+<p class="label">The rest of the scroll</p>
+<div class="phone">
+  <div class="sh"><h2><span>02</span>Top floppers this week</h2><a>Full rankings</a></div>
+  <div class="toggle"><span class="on">Players</span><span>Clubs</span><span>Nations</span></div>
+  <div class="lb">
+    <div class="r"><span class="n">1</span><div class="nm"><b>M. Vellani</b><span>Northbridge · 3 flops</span></div><div class="barw"><i style="width:100%"></i></div><span class="v">94.2</span></div>
+    <div class="r"><span class="n">2</span><div class="nm"><b>J. Okafor-Price</b><span>Calder Utd · 2 flops</span></div><div class="barw"><i style="width:81%"></i></div><span class="v">76.0</span></div>
+    <div class="r"><span class="n">3</span><div class="nm"><b>T. Lindqvist</b><span>Harrow Ath. · 4 flops</span></div><div class="barw"><i style="width:70%"></i></div><span class="v">65.8</span></div>
+    <div class="r"><span class="n">4</span><div class="nm"><b>R. Duarte</b><span>Ferris Town · 1 flop</span></div><div class="barw"><i style="width:52%"></i></div><span class="v">49.1</span></div>
+    <div class="r"><span class="n">5</span><div class="nm"><b>A. Mensah</b><span>Northbridge · 2 flops</span></div><div class="barw"><i style="width:44%"></i></div><span class="v">41.7</span></div>
+  </div>
+
+  <div class="sh"><h2><span>03</span>This week in the lab</h2><a>All matches</a></div>
+  <div class="docket">
+    <div class="m"><span><b>Northbridge 1–1 Calder Utd</b></span><span class="pill">6 flops</span></div>
+    <div class="m"><span><b>Harrow Ath. 2–0 Ferris Town</b></span><span class="pill">3 flops</span></div>
+    <div class="m nf"><span>Kingsmoor 0–3 Harrowgate</span><span class="pill">No footage</span></div>
+    <div class="m"><span><b>Ashby Rovers 0–0 Wexley</b></span><span class="pill">0 flops ✓</span></div>
+    <div class="m nf"><span>Daleford 2–2 Port Elm</span><span class="pill">No footage</span></div>
+  </div>
+  <div class="cov">Matchweek 12 coverage: 6 of 10 studied<div class="covbar"><i style="width:60%"></i><s></s></div></div>
+
+  <div class="sh"><h2><span>04</span>Awards race</h2><a>Ceremony</a></div>
+  <div class="awards"><h4>Season award · live standings</h4><div class="t">The Golden Swan</div>
+    <div class="race">
+      <div class="l"><span style="text-align:left;font-family:var(--sans);font-weight:600">M. Vellani</span><i style="width:100%"></i><span>412</span></div>
+      <div class="l"><span style="text-align:left;font-family:var(--sans);font-weight:600">T. Lindqvist</span><i style="width:86%"></i><span>355</span></div>
+      <div class="l"><span style="text-align:left;font-family:var(--sans);font-weight:600">J. Okafor-Price</span><i style="width:61%"></i><span>251</span></div>
+    </div></div>
+
+  <div class="sh"><h2><span>05</span>Who's the bigger flopper?</h2><a>Results</a></div>
+  <div class="h2h">
+    <div class="q">Tap the bigger flopper</div>
+    <div class="pair"><div class="pick"><div class="ph"></div><b>R. Duarte</b><span>Ferris Town</span></div><div class="or">OR</div><div class="pick"><div class="ph"></div><b>A. Mensah</b><span>Northbridge</span></div></div>
+    <div class="sub">12,406 verdicts today · popularity ranking, not SIM</div>
+  </div>
+
+  <div class="ad">Reserved · sponsor space</div>
+  <div class="news"><b>The Weekly Flop Report</b><p>Findings, every Monday. Coming soon.</p><div class="in"><span>you@example.com</span><i>Notify me</i></div></div>
+  <div class="foot">SIM Rating = how the Institute scores theatre. <u>Read the methodology</u>.<br>A match marked "No footage" has not been studied. It does not mean zero flops.<br>© Flopstats · Institute of Flopology · Contact was minimal.</div>
+  <div class="tabbar"><div class="on"><i></i>Today</div><div><i></i>Rankings</div><div><i></i>Compare</div><div><i></i>Awards</div><div><i></i>More</div></div>
+</div>
+</div>
+
+</div>
+</body>
+</html>
