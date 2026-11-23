@@ -60,7 +60,7 @@ Note: wrongly labelling a player as a flopper is **not** a concern. Jamison said
 - **Footage:** footballia.eu full matches, starting with the historical archive. It needs a login, and the old repo has a Selenium login and scraper to use as reference. The old repo also has an index of about 1,270 Premier League matches from 2015–2025 (`urls/game_urls_2015_2025.csv`) as a starting point. Switch sources only if needed.
 - **Football data:** API-Football (the source of the old database). Data is downloaded only for matches we analyze.
 - **Budget:** scrappy side project. Keep fixed monthly costs low, and prefer usage-based services.
-- **Rights:** using footballia footage on a public, eventually monetized site is a known risk. For now it's accepted ("scrappy test"). It's to be revisited before public launch.
+- **Rights:** using footballia footage on a public, eventually monetized site is a known risk. It's accepted until the project shows traction ("scrappy test"), including for public clips and other unofficial sources; licensing comes later. See the project stance in `AGENTS.md`.
 - **People:** Jamison is the only reviewer in stage 1, with limited time.
 
 ## 5. Approaches considered
